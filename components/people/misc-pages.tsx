@@ -26,6 +26,7 @@ import { useAuthStore } from "@/lib/stores/auth-store";
 import { useDataStore } from "@/lib/stores/data-store";
 import { announcementFormSchema, type AnnouncementFormValues } from "@/lib/validations/announcement";
 import { saturdayWeekLabel, workWeekPolicyLabel } from "@/lib/attendance/work-calendar";
+import { YEARLY_PAID_LEAVE_LABEL } from "@/lib/leave/policy";
 import { currency, documentTypeLabel, formatDate, formatDateTime, formatPeriod } from "@/lib/utils/format";
 import type { Announcement, EmployeeDocument, PayrollRecord, SaturdayWeek, Weekday } from "@/types";
 import { CORE_WORK_DAYS, DEFAULT_SATURDAY_OFF_WEEKS, SATURDAY_WEEKS } from "@/types";
@@ -437,6 +438,16 @@ export function SettingsPage() {
             />
           </div>
           <p className={`${formWideClass} text-sm text-muted-foreground`}>Current policy: {workWeekPolicyLabel(draft)}.</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader><CardTitle className="text-base">Yearly paid leave</CardTitle></CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <p className="font-medium">{YEARLY_PAID_LEAVE_LABEL}</p>
+          <p className="text-muted-foreground">
+            Every employee receives 15 paid days each year: 6 casual leave, 6 sick leave, and 3 privilege leave.
+            Unpaid leave is only used if paid balance is exhausted.
+          </p>
         </CardContent>
       </Card>
       <Card>

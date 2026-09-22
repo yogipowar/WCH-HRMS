@@ -132,7 +132,7 @@ export function BreaksReportPage() {
 export function LeaveReportPage() {
   const data = useDataStore();
   return (
-    <ReportShell title="Leave report" description="Leave requests across the team.">
+    <ReportShell title="Leave report" description="Yearly paid leave is 15 days: 6 CL + 6 SL + 3 PL.">
       <div className="grid gap-3 sm:grid-cols-4">
         {(["PENDING", "APPROVED", "REJECTED", "CANCELLED"] as const).map((status) => (
           <Card key={status}><CardContent className="p-4"><p className="text-sm text-muted-foreground">{status}</p><p className="text-2xl font-semibold">{data.leaveRequests.filter((item) => item.status === status).length}</p></CardContent></Card>

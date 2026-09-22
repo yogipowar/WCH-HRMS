@@ -20,6 +20,7 @@ import type {
   User,
 } from "@/types";
 import { REQUIRED_DAILY_HOURS } from "@/types";
+import { remainingFromApproved } from "@/lib/leave/policy";
 import { buildPayrollHistory } from "@/lib/payroll/record";
 
 export interface AppData {
@@ -164,24 +165,17 @@ export const employees: Employee[] = [
 export const leaveRequests: LeaveRequest[] = [
   { id: "leave-001", employeeId: "emp-008", type: "CASUAL", startDate: "2026-09-22", endDate: "2026-09-22", isHalfDay: false, reason: "Family function in Mumbai.", attachmentName: null, status: "APPROVED", rejectionReason: null, reviewedBy: "user-admin", reviewedAt: at("2026-09-20", "11:15"), createdAt: at("2026-09-18", "16:40") },
   { id: "leave-002", employeeId: "emp-001", type: "SICK", startDate: "2026-09-25", endDate: "2026-09-25", isHalfDay: true, reason: "Doctor appointment in the afternoon.", attachmentName: "prescription.pdf", status: "PENDING", rejectionReason: null, reviewedBy: null, reviewedAt: null, createdAt: at("2026-09-21", "10:05") },
-  { id: "leave-003", employeeId: "emp-006", type: "EARNED", startDate: "2026-09-28", endDate: "2026-09-30", isHalfDay: false, reason: "Out-of-town personal travel.", attachmentName: null, status: "PENDING", rejectionReason: null, reviewedBy: null, reviewedAt: null, createdAt: at("2026-09-19", "14:22") },
+  { id: "leave-003", employeeId: "emp-006", type: "PRIVILEGE", startDate: "2026-09-28", endDate: "2026-09-30", isHalfDay: false, reason: "Out-of-town personal travel.", attachmentName: null, status: "PENDING", rejectionReason: null, reviewedBy: null, reviewedAt: null, createdAt: at("2026-09-19", "14:22") },
   { id: "leave-004", employeeId: "emp-012", type: "SICK", startDate: "2026-09-15", endDate: "2026-09-16", isHalfDay: false, reason: "Viral fever and rest advised.", attachmentName: "medical-note.pdf", status: "APPROVED", rejectionReason: null, reviewedBy: "user-admin", reviewedAt: at("2026-09-15", "09:40"), createdAt: at("2026-09-15", "08:12") },
   { id: "leave-005", employeeId: "emp-003", type: "CASUAL", startDate: "2026-09-10", endDate: "2026-09-10", isHalfDay: false, reason: "Personal errand.", attachmentName: null, status: "REJECTED", rejectionReason: "Sprint release is scheduled the same day.", reviewedBy: "user-admin", reviewedAt: at("2026-09-09", "17:05"), createdAt: at("2026-09-09", "11:30") },
   { id: "leave-006", employeeId: "emp-009", type: "UNPAID", startDate: "2026-08-28", endDate: "2026-08-29", isHalfDay: false, reason: "Family emergency travel.", attachmentName: null, status: "APPROVED", rejectionReason: null, reviewedBy: "user-admin", reviewedAt: at("2026-08-27", "18:10"), createdAt: at("2026-08-27", "12:00") },
   { id: "leave-007", employeeId: "emp-014", type: "CASUAL", startDate: "2026-10-02", endDate: "2026-10-03", isHalfDay: false, reason: "Wedding in the family.", attachmentName: null, status: "PENDING", rejectionReason: null, reviewedBy: null, reviewedAt: null, createdAt: at("2026-09-21", "18:45") },
-  { id: "leave-008", employeeId: "emp-010", type: "OTHER", startDate: "2026-09-04", endDate: "2026-09-04", isHalfDay: true, reason: "Bank work in the morning.", attachmentName: null, status: "CANCELLED", rejectionReason: null, reviewedBy: null, reviewedAt: null, createdAt: at("2026-09-02", "09:18") },
-  { id: "leave-009", employeeId: "emp-007", type: "EARNED", startDate: "2026-09-07", endDate: "2026-09-08", isHalfDay: false, reason: "Short family trip.", attachmentName: null, status: "APPROVED", rejectionReason: null, reviewedBy: "user-admin", reviewedAt: at("2026-09-05", "10:20"), createdAt: at("2026-09-04", "15:33") },
+  { id: "leave-008", employeeId: "emp-010", type: "CASUAL", startDate: "2026-09-04", endDate: "2026-09-04", isHalfDay: true, reason: "Bank work in the morning.", attachmentName: null, status: "CANCELLED", rejectionReason: null, reviewedBy: null, reviewedAt: null, createdAt: at("2026-09-02", "09:18") },
+  { id: "leave-009", employeeId: "emp-007", type: "PRIVILEGE", startDate: "2026-09-07", endDate: "2026-09-08", isHalfDay: false, reason: "Short family trip.", attachmentName: null, status: "APPROVED", rejectionReason: null, reviewedBy: "user-admin", reviewedAt: at("2026-09-05", "10:20"), createdAt: at("2026-09-04", "15:33") },
   { id: "leave-010", employeeId: "emp-002", type: "SICK", startDate: "2026-09-26", endDate: "2026-09-26", isHalfDay: false, reason: "Dental procedure.", attachmentName: null, status: "PENDING", rejectionReason: null, reviewedBy: null, reviewedAt: null, createdAt: at("2026-09-22", "09:10") },
 ];
 
-export const leaveBalances: LeaveBalance[] = employees.map((item) => ({
-  employeeId: item.id,
-  casual: item.id === "emp-008" ? 7 : 8,
-  sick: item.id === "emp-012" ? 4 : 6,
-  earned: item.id === "emp-007" || item.id === "emp-009" ? 10 : 12,
-  unpaid: 5,
-  other: 2,
-}));
+export const leaveBalances: LeaveBalance[] = employees.map((item) => remainingFromApproved(item.id, leaveRequests));
 
 export const holidays: Holiday[] = [
   { id: "hol-001", name: "Independence Day", date: "2026-08-15", type: "PUBLIC", description: "National holiday.", recurring: true },
@@ -509,7 +503,7 @@ export const announcements: Announcement[] = [
 
 export const notifications: Notification[] = [
   { id: "ntf-001", userId: "user-admin", type: "LEAVE_PENDING", title: "Leave request pending", message: "Yogesh Powar requested a half-day sick leave for 25 Sep.", read: false, createdAt: at("2026-09-21", "10:06"), href: "/leave" },
-  { id: "ntf-002", userId: "user-admin", type: "LEAVE_PENDING", title: "Leave request pending", message: "Neha Patel requested earned leave from 28-30 Sep.", read: false, createdAt: at("2026-09-19", "14:23"), href: "/leave" },
+  { id: "ntf-002", userId: "user-admin", type: "LEAVE_PENDING", title: "Leave request pending", message: "Neha Patel requested privilege leave from 28-30 Sep.", read: false, createdAt: at("2026-09-19", "14:23"), href: "/leave" },
   { id: "ntf-003", userId: "user-admin", type: "LATE_ARRIVAL", title: "Late arrivals today", message: "Priya Sharma, Karan Joshi, and Rahul Verma clocked in after 09:40.", read: false, createdAt: at(TODAY, "10:20"), href: "/attendance" },
   { id: "ntf-004", userId: "user-admin", type: "ANNOUNCEMENT", title: "Draft announcement ready", message: "October holiday calendar is saved as draft.", read: true, createdAt: at(TODAY, "09:05"), href: "/announcements" },
   { id: "ntf-005", userId: "user-001", type: "LEAVE_PENDING", title: "Leave submitted", message: "Your half-day sick leave request is awaiting approval.", read: false, createdAt: at("2026-09-21", "10:06"), href: "/leave" },
@@ -517,7 +511,7 @@ export const notifications: Notification[] = [
   { id: "ntf-007", userId: "user-001", type: "HOLIDAY", title: "Upcoming holiday", message: "Gandhi Jayanti is observed on 02 Oct.", read: false, createdAt: at("2026-09-20", "09:00"), href: "/holidays" },
   { id: "ntf-008", userId: "user-008", type: "LEAVE_APPROVED", title: "Leave approved", message: "Your casual leave for 22 Sep has been approved.", read: true, createdAt: at("2026-09-20", "11:16"), href: "/leave" },
   { id: "ntf-009", userId: "user-003", type: "LEAVE_REJECTED", title: "Leave rejected", message: "Your casual leave for 10 Sep was rejected.", read: true, createdAt: at("2026-09-09", "17:06"), href: "/leave" },
-  { id: "ntf-010", userId: "user-006", type: "LEAVE_PENDING", title: "Leave submitted", message: "Your earned leave request is awaiting approval.", read: false, createdAt: at("2026-09-19", "14:23"), href: "/leave" },
+  { id: "ntf-010", userId: "user-006", type: "LEAVE_PENDING", title: "Leave submitted", message: "Your privilege leave request is awaiting approval.", read: false, createdAt: at("2026-09-19", "14:23"), href: "/leave" },
 ];
 
 export const documents: EmployeeDocument[] = [

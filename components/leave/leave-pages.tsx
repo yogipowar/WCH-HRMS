@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { formFieldControlClass, formGridClass, formWideClass } from "@/lib/ui/form-styles";
+import { remainingPaidDays, YEARLY_PAID_LEAVE_LABEL, YEARLY_PAID_LEAVE_TOTAL, YEARLY_PAID_LEAVES } from "@/lib/leave/policy";
 import { daysBetweenInclusive, formatDate, leaveTypeLabel } from "@/lib/utils/format";
 import { getDepartmentName, getEmployeeByUser, getEmployeeName } from "@/lib/lookups";
 import { leaveService } from "@/lib/services/leaveService";
@@ -47,17 +48,21 @@ function EmployeeLeave({ employeeId }: { employeeId: string }) {
   });
 
   function onSubmit(values: LeaveFormValues) {
-    leaveService.createLeaveRequest({
-      employeeId,
-      type: values.type,
-      startDate: values.startDate,
-      endDate: values.endDate,
-      isHalfDay: values.isHalfDay,
-      reason: values.reason,
-      attachmentName: values.attachmentName || null,
-    });
-    toast.success("Leave request submitted.");
-    form.reset();
+    try {
+      leaveService.createLeaveRequest({
+        employeeId,
+        type: values.type,
+        startDate: values.startDate,
+        endDate: values.endDate,
+        isHalfDay: values.isHalfDay,
+        reason: values.reason,
+        attachmentName: values.attachmentName || null,
+      });
+      toast.success("Leave request submitted.");
+      form.reset();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not submit leave request.");
+    }
   }
 
   const columns: DataTableColumn<LeaveRequest>[] = [
@@ -70,12 +75,12 @@ function EmployeeLeave({ employeeId }: { employeeId: string }) {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="My leaves" description="Check your balance and apply for time off." />
+      <PageHeader title="My leaves" description={YEARLY_PAID_LEAVE_LABEL} />
       <div className="grid gap-3 sm:grid-cols-4">
-        <Balance title="Casual leave" value={balance.casual} />
-        <Balance title="Sick leave" value={balance.sick} />
-        <Balance title="Earned leave" value={balance.earned} />
-        <Balance title="Unpaid leave" value={balance.unpaid} />
+        <Balance title="Casual leave (CL)" value={balance.casual} entitlement={YEARLY_PAID_LEAVES.casual} />
+        <Balance title="Sick leave (SL)" value={balance.sick} entitlement={YEARLY_PAID_LEAVES.sick} />
+        <Balance title="Privilege leave (PL)" value={balance.privilege} entitlement={YEARLY_PAID_LEAVES.privilege} />
+        <Balance title="Paid remaining" value={remainingPaidDays(balance)} entitlement={YEARLY_PAID_LEAVE_TOTAL} />
       </div>
       <Card>
         <CardHeader><CardTitle className="text-base">Apply for leave</CardTitle></CardHeader>
@@ -84,22 +89,20 @@ function EmployeeLeave({ employeeId }: { employeeId: string }) {
             <div>
               <Label>Leave type</Label>
               <NativeSelect className={formFieldControlClass} {...form.register("type")}>
-                <option value="CASUAL">Casual Leave</option>
-                <option value="SICK">Sick Leave</option>
-                <option value="EARNED">Earned Leave</option>
-                <option value="UNPAID">Unpaid Leave</option>
-                <option value="OTHER">Other</option>
+                <option value="CASUAL">Casual Leave (CL)</option>
+                <option value="SICK">Sick Leave (SL)</option>
+                <option value="PRIVILEGE">Privilege Leave (PL)</option>
               </NativeSelect>
             </div>
             <div>
               <Label>Start date</Label>
               <Input type="date" className="mt-1.5" {...form.register("startDate")} />
-              <Error message={form.formState.errors.startDate?.message} />
+              <FieldError message={form.formState.errors.startDate?.message} />
             </div>
             <div>
               <Label>End date</Label>
               <Input type="date" className="mt-1.5" {...form.register("endDate")} />
-              <Error message={form.formState.errors.endDate?.message} />
+              <FieldError message={form.formState.errors.endDate?.message} />
             </div>
             <div className="flex h-10 items-center gap-2 md:mt-7">
               <input id="half" type="checkbox" {...form.register("isHalfDay")} />
@@ -115,7 +118,7 @@ function EmployeeLeave({ employeeId }: { employeeId: string }) {
             <div className={formWideClass}>
               <Label>Reason</Label>
               <Textarea className="mt-1.5" {...form.register("reason")} />
-              <Error message={form.formState.errors.reason?.message} />
+              <FieldError message={form.formState.errors.reason?.message} />
             </div>
           </form>
         </CardContent>
@@ -176,7 +179,7 @@ function ManagementLeave({ data, reviewerId }: { data: ReturnType<typeof useData
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Leave management" description="Approve or reject employee leave requests." />
+      <PageHeader title="Leave management" description={YEARLY_PAID_LEAVE_LABEL} />
       <DataTable
         data={rows}
         columns={columns}
@@ -234,18 +237,19 @@ function ManagementLeave({ data, reviewerId }: { data: ReturnType<typeof useData
   );
 }
 
-function Balance({ title, value }: { title: string; value: number }) {
+function Balance({ title, value, entitlement }: { title: string; value: number; entitlement: number }) {
   return (
     <Card>
       <CardContent className="p-4">
         <p className="text-sm text-muted-foreground">{title}</p>
         <p className="text-2xl font-semibold">{value} days</p>
+        <p className="mt-1 text-xs text-muted-foreground">of {entitlement} yearly</p>
       </CardContent>
     </Card>
   );
 }
 
-function Error({ message }: { message?: string }) {
+function FieldError({ message }: { message?: string }) {
   if (!message) return null;
   return <p className="mt-1 text-xs text-destructive">{message}</p>;
 }

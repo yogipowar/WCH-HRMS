@@ -6,7 +6,8 @@ import { createSeedData, type AppData } from "@/data/mock-data";
 import { isWeeklyOff, resolveWorkPolicy } from "@/lib/attendance/work-calendar";
 import { STORAGE_KEYS } from "@/lib/constants";
 import { buildPayrollRecord, CURRENT_PAYROLL_PERIOD, payrollAmounts } from "@/lib/payroll/record";
-import type { CompanySettings, Employee, User } from "@/types";
+import { defaultLeaveBalance, normalizeLeaveType, remainingFromApproved } from "@/lib/leave/policy";
+import type { CompanySettings, Employee, LeaveBalance, LeaveRequest, User } from "@/types";
 
 interface DataStore extends AppData {
   hydrateFromSeed: () => void;
@@ -53,6 +54,19 @@ export const useDataStore = create<DataStore>()(
         const users = (persisted.users ?? currentState.users).map((item) =>
           withUserLogin(item, currentState.users.find((seed) => seed.id === item.id)),
         );
+        const leaveRequests = (persisted.leaveRequests ?? currentState.leaveRequests).map(withLeaveRequest);
+        const leaveBalanceByEmployee = new Map(
+          (persisted.leaveBalances ?? currentState.leaveBalances).map((item) => [
+            item.employeeId,
+            withLeaveBalance(item, leaveRequests),
+          ]),
+        );
+        for (const employee of employees) {
+          if (!leaveBalanceByEmployee.has(employee.id)) {
+            leaveBalanceByEmployee.set(employee.id, defaultLeaveBalance(employee.id));
+          }
+        }
+        const leaveBalances = [...leaveBalanceByEmployee.values()];
         const payrollById = new Map(
           (currentState.payrollRecords ?? []).map((item) => [item.id, item]),
         );
@@ -77,6 +91,8 @@ export const useDataStore = create<DataStore>()(
           attendanceRecords,
           employees,
           users,
+          leaveRequests,
+          leaveBalances,
           payrollRecords,
         };
       },
@@ -106,6 +122,25 @@ export function getData(): AppData {
 export function updateData(updater: (current: AppData) => Partial<AppData>): void {
   const current = getData();
   useDataStore.getState().setData(updater(current));
+}
+
+function withLeaveRequest(request: LeaveRequest): LeaveRequest {
+  return { ...request, type: normalizeLeaveType(request.type) };
+}
+
+function withLeaveBalance(
+  balance: LeaveBalance & { earned?: number; unpaid?: number; other?: number },
+  requests: LeaveRequest[],
+): LeaveBalance {
+  if (typeof balance.privilege === "number") {
+    return {
+      employeeId: balance.employeeId,
+      casual: balance.casual,
+      sick: balance.sick,
+      privilege: balance.privilege,
+    };
+  }
+  return remainingFromApproved(balance.employeeId, requests);
 }
 
 function withUserLogin(user: User, seed?: User): User {

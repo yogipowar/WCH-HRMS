@@ -55,9 +55,8 @@ export type BreakType = (typeof BREAK_TYPES)[number];
 export const LEAVE_TYPES = [
   "CASUAL",
   "SICK",
-  "EARNED",
+  "PRIVILEGE",
   "UNPAID",
-  "OTHER",
 ] as const;
 export type LeaveType = (typeof LEAVE_TYPES)[number];
 
@@ -231,9 +230,7 @@ export interface LeaveBalance {
   employeeId: string;
   casual: number;
   sick: number;
-  earned: number;
-  unpaid: number;
-  other: number;
+  privilege: number;
 }
 
 export interface LeaveRequest {

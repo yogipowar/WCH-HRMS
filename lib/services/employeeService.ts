@@ -1,6 +1,7 @@
 import { getData, updateData } from "@/lib/stores/data-store";
 import { createId } from "@/lib/lookups";
 import { isUsernameTaken } from "@/lib/auth/credentials";
+import { defaultLeaveBalance } from "@/lib/leave/policy";
 import { buildPayrollRecord, CURRENT_PAYROLL_PERIOD, payrollAmounts } from "@/lib/payroll/record";
 import type { Employee } from "@/types";
 
@@ -43,7 +44,7 @@ export const employeeService = {
       ],
       leaveBalances: [
         ...data.leaveBalances,
-        { employeeId: employee.id, casual: 8, sick: 6, earned: 12, unpaid: 5, other: 2 },
+        defaultLeaveBalance(employee.id),
       ],
       payrollRecords: [...data.payrollRecords, buildPayrollRecord({ ...employee, userId })],
     }));

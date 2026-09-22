@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDuration, summarizeAttendance } from "@/lib/attendance/calculations";
 import { getDepartmentName, getDesignationName, getReportingPersonName, toLiveStatus } from "@/lib/lookups";
+import { remainingPaidDays, YEARLY_PAID_LEAVE_TOTAL, YEARLY_PAID_LEAVES } from "@/lib/leave/policy";
 import { payrollService } from "@/lib/services/payrollService";
 import { useDataStore } from "@/lib/stores/data-store";
 import { currency, documentTypeLabel, employmentTypeLabel, formatDate, formatPeriod, formatTime, initials, leaveTypeLabel } from "@/lib/utils/format";
@@ -145,10 +146,10 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
         </TabsContent>
         <TabsContent value="leaves" className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-4">
-            <InfoCard title="Casual" value={`${balance?.casual ?? 0} days`} />
-            <InfoCard title="Sick" value={`${balance?.sick ?? 0} days`} />
-            <InfoCard title="Earned" value={`${balance?.earned ?? 0} days`} />
-            <InfoCard title="Unpaid" value={`${balance?.unpaid ?? 0} days`} />
+            <InfoCard title="Casual (CL)" value={`${balance?.casual ?? 0} / ${YEARLY_PAID_LEAVES.casual} days`} />
+            <InfoCard title="Sick (SL)" value={`${balance?.sick ?? 0} / ${YEARLY_PAID_LEAVES.sick} days`} />
+            <InfoCard title="Privilege (PL)" value={`${balance?.privilege ?? 0} / ${YEARLY_PAID_LEAVES.privilege} days`} />
+            <InfoCard title="Paid remaining" value={`${balance ? remainingPaidDays(balance) : 0} / ${YEARLY_PAID_LEAVE_TOTAL} days`} />
           </div>
           {leaves.map((item) => (
             <div key={item.id} className="flex items-center justify-between rounded-lg border p-3 text-sm">

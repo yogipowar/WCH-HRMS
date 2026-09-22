@@ -1,4 +1,5 @@
 import { createId } from "@/lib/lookups";
+import { applyLeaveToBalance, defaultLeaveBalance, leaveDaysUsed, paidLeaveKey } from "@/lib/leave/policy";
 import { getData, updateData } from "@/lib/stores/data-store";
 import type { LeaveRequest, LeaveStatus, LeaveType } from "@/types";
 
@@ -13,16 +14,7 @@ export const leaveService = {
     return getData().leaveRequests.find((item) => item.id === id) ?? null;
   },
   getBalance(employeeId: string) {
-    return (
-      getData().leaveBalances.find((item) => item.employeeId === employeeId) ?? {
-        employeeId,
-        casual: 0,
-        sick: 0,
-        earned: 0,
-        unpaid: 0,
-        other: 0,
-      }
-    );
+    return getData().leaveBalances.find((item) => item.employeeId === employeeId) ?? defaultLeaveBalance(employeeId);
   },
   createLeaveRequest(input: {
     employeeId: string;
@@ -33,6 +25,14 @@ export const leaveService = {
     reason: string;
     attachmentName: string | null;
   }) {
+    const key = paidLeaveKey(input.type);
+    if (key) {
+      const balance = this.getBalance(input.employeeId);
+      const days = leaveDaysUsed(input);
+      if (balance[key] < days) {
+        throw new Error(`Not enough ${key} leave remaining.`);
+      }
+    }
     const request: LeaveRequest = {
       id: createId("leave"),
       status: "PENDING",
@@ -51,8 +51,12 @@ export const leaveService = {
     reviewedBy: string | null,
     rejectionReason: string | null = null,
   ) {
-    updateData((data) => ({
-      leaveRequests: data.leaveRequests.map((item) =>
+    updateData((data) => {
+      const current = data.leaveRequests.find((item) => item.id === id);
+      if (!current) {
+        return {};
+      }
+      const leaveRequests = data.leaveRequests.map((item) =>
         item.id === id
           ? {
               ...item,
@@ -62,7 +66,19 @@ export const leaveService = {
               rejectionReason,
             }
           : item,
-      ),
-    }));
+      );
+      let leaveBalances = data.leaveBalances;
+      if (current.status !== "APPROVED" && status === "APPROVED") {
+        leaveBalances = data.leaveBalances.map((item) =>
+          item.employeeId === current.employeeId ? applyLeaveToBalance(item, current, "deduct") : item,
+        );
+      }
+      if (current.status === "APPROVED" && status !== "APPROVED") {
+        leaveBalances = data.leaveBalances.map((item) =>
+          item.employeeId === current.employeeId ? applyLeaveToBalance(item, current, "restore") : item,
+        );
+      }
+      return { leaveRequests, leaveBalances };
+    });
   },
 };

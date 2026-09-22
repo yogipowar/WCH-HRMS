@@ -37,10 +37,10 @@ export function EmployeeDashboard({ employee }: { employee: Employee }) {
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-3 text-sm">
-            <Balance label="Casual" value={balance?.casual ?? 0} />
-            <Balance label="Sick" value={balance?.sick ?? 0} />
-            <Balance label="Earned" value={balance?.earned ?? 0} />
-            <Balance label="Unpaid" value={balance?.unpaid ?? 0} />
+            <Balance label="Casual (CL)" value={balance?.casual ?? 0} />
+            <Balance label="Sick (SL)" value={balance?.sick ?? 0} />
+            <Balance label="Privilege (PL)" value={balance?.privilege ?? 0} />
+            <Balance label="Paid left" value={(balance?.casual ?? 0) + (balance?.sick ?? 0) + (balance?.privilege ?? 0)} />
           </CardContent>
         </Card>
         <Card className="shadow-sm">

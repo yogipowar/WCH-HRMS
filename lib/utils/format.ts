@@ -54,12 +54,10 @@ export function leaveTypeLabel(type: LeaveType): string {
       return "Casual Leave";
     case "SICK":
       return "Sick Leave";
-    case "EARNED":
-      return "Earned Leave";
+    case "PRIVILEGE":
+      return "Privilege Leave";
     case "UNPAID":
       return "Unpaid Leave";
-    case "OTHER":
-      return "Other";
   }
 }
 

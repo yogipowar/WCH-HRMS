@@ -21,6 +21,10 @@ Active working time = elapsed work session − lunch and personal breaks.
 
 The daily target is **9 active working hours**.
 
+## Leave plan
+
+**15 Paid Leaves = 6 CL + 6 SL + 3 PL** each year (casual, sick, and privilege leave).
+
 ## Stack
 
 Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui, Zustand, React Hook Form, Zod, Recharts, date-fns.
