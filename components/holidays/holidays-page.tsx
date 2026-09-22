@@ -71,10 +71,10 @@ export function HolidaysPage() {
         description={`Company holiday calendar. Weekly offs: ${workWeekPolicyLabel(settings)}.`}
         actions={canManage ? <Button onClick={() => { setEditing(null); form.reset({ name: "", date: "", type: "COMPANY", description: "", recurring: true }); setOpen(true); }}>Add holiday</Button> : null}
       />
-      <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
-        <Card>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+        <Card className="w-full min-w-0">
           <CardHeader><CardTitle className="text-base">Monthly calendar</CardTitle></CardHeader>
-          <CardContent>
+          <CardContent className="px-3 sm:px-6">
             <Calendar
               mode="multiple"
               month={month}
@@ -84,6 +84,13 @@ export function HolidaysPage() {
               modifiersClassNames={{
                 holiday: "bg-violet-500/15 text-violet-800 dark:text-violet-200",
                 weeklyOff: "bg-slate-500/15 text-slate-800 dark:text-slate-200",
+              }}
+              className="w-full p-0 [--cell-size:clamp(2.4rem,12vw,2.85rem)]"
+              classNames={{
+                root: "w-full",
+                months: "w-full",
+                month: "w-full",
+                month_grid: "w-full",
               }}
             />
             <p className="mt-3 text-xs text-muted-foreground">Highlighted dates include company holidays and weekly offs.</p>
