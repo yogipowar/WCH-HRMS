@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -72,9 +72,12 @@ export function HolidaysPage() {
         actions={canManage ? <Button onClick={() => { setEditing(null); form.reset({ name: "", date: "", type: "COMPANY", description: "", recurring: true }); setOpen(true); }}>Add holiday</Button> : null}
       />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-        <Card className="w-full min-w-0">
+        <Card className="w-full min-w-0 overflow-visible">
           <CardHeader><CardTitle className="text-base">Monthly calendar</CardTitle></CardHeader>
-          <CardContent className="px-3 sm:px-6">
+          <CardContent
+            className="overflow-visible px-3 sm:px-6"
+            style={{ "--cell-size": "clamp(2.25rem, 11vw, 2.75rem)" } as CSSProperties}
+          >
             <Calendar
               mode="multiple"
               month={month}
@@ -85,12 +88,16 @@ export function HolidaysPage() {
                 holiday: "bg-violet-500/15 text-violet-800 dark:text-violet-200",
                 weeklyOff: "bg-slate-500/15 text-slate-800 dark:text-slate-200",
               }}
-              className="w-full p-0 [--cell-size:clamp(2.4rem,12vw,2.85rem)]"
+              className="w-full overflow-visible"
               classNames={{
                 root: "w-full",
-                months: "w-full",
+                months: "relative w-full",
                 month: "w-full",
                 month_grid: "w-full",
+                nav: "absolute inset-x-0 top-0 z-20 flex h-10 items-center justify-between",
+                button_previous: "size-9",
+                button_next: "size-9",
+                month_caption: "h-10 px-10",
               }}
             />
             <p className="mt-3 text-xs text-muted-foreground">Highlighted dates include company holidays and weekly offs.</p>
