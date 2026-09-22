@@ -76,7 +76,7 @@ function EmployeeLeave({ employeeId }: { employeeId: string }) {
   return (
     <div className="space-y-6">
       <PageHeader title="My leaves" description={YEARLY_PAID_LEAVE_LABEL} />
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Balance title="Casual leave (CL)" value={balance.casual} entitlement={YEARLY_PAID_LEAVES.casual} />
         <Balance title="Sick leave (SL)" value={balance.sick} entitlement={YEARLY_PAID_LEAVES.sick} />
         <Balance title="Privilege leave (PL)" value={balance.privilege} entitlement={YEARLY_PAID_LEAVES.privilege} />

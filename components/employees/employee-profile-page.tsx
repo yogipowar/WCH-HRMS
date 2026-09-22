@@ -145,7 +145,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
           </Card>
         </TabsContent>
         <TabsContent value="leaves" className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <InfoCard title="Casual (CL)" value={`${balance?.casual ?? 0} / ${YEARLY_PAID_LEAVES.casual} days`} />
             <InfoCard title="Sick (SL)" value={`${balance?.sick ?? 0} / ${YEARLY_PAID_LEAVES.sick} days`} />
             <InfoCard title="Privilege (PL)" value={`${balance?.privilege ?? 0} / ${YEARLY_PAID_LEAVES.privilege} days`} />
