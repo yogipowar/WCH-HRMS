@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -71,36 +71,37 @@ export function HolidaysPage() {
         description={`Company holiday calendar. Weekly offs: ${workWeekPolicyLabel(settings)}.`}
         actions={canManage ? <Button onClick={() => { setEditing(null); form.reset({ name: "", date: "", type: "COMPANY", description: "", recurring: true }); setOpen(true); }}>Add holiday</Button> : null}
       />
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-        <Card className="w-full min-w-0 overflow-visible">
+      <div className="grid gap-4 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-start">
+        <Card className="w-full min-w-0 overflow-visible lg:w-max lg:justify-self-start">
           <CardHeader><CardTitle className="text-base">Monthly calendar</CardTitle></CardHeader>
-          <CardContent
-            className="overflow-visible px-3 sm:px-6"
-            style={{ "--cell-size": "clamp(2.25rem, 11vw, 2.75rem)" } as CSSProperties}
-          >
-            <Calendar
-              mode="multiple"
-              month={month}
-              onMonthChange={setMonth}
-              selected={[...selectedDates, ...weeklyOffDates]}
-              modifiers={{ holiday: selectedDates, weeklyOff: weeklyOffDates }}
-              modifiersClassNames={{
-                holiday: "bg-violet-500/15 text-violet-800 dark:text-violet-200",
-                weeklyOff: "bg-slate-500/15 text-slate-800 dark:text-slate-200",
-              }}
-              className="w-full overflow-visible"
-              classNames={{
-                root: "w-full",
-                months: "relative w-full",
-                month: "w-full",
-                month_grid: "w-full",
-                nav: "absolute inset-x-0 top-0 z-20 flex h-10 items-center justify-between",
-                button_previous: "size-9",
-                button_next: "size-9",
-                month_caption: "h-10 px-10",
-              }}
-            />
-            <p className="mt-3 text-xs text-muted-foreground">Highlighted dates include company holidays and weekly offs.</p>
+          <CardContent className="overflow-visible px-3 sm:px-6">
+            <div className="w-full lg:w-fit">
+              <Calendar
+                mode="multiple"
+                month={month}
+                onMonthChange={setMonth}
+                selected={[...selectedDates, ...weeklyOffDates]}
+                modifiers={{ holiday: selectedDates, weeklyOff: weeklyOffDates }}
+                modifiersClassNames={{
+                  holiday: "bg-violet-500/15 text-violet-800 dark:text-violet-200",
+                  weeklyOff: "bg-slate-500/15 text-slate-800 dark:text-slate-200",
+                }}
+                className="w-full overflow-visible lg:w-fit"
+                classNames={{
+                  root: "w-full lg:w-fit",
+                  months: "relative w-full lg:w-fit",
+                  month: "w-full lg:w-fit",
+                  month_grid: "w-full",
+                  week: "w-full",
+                  day: "lg:size-(--cell-size) lg:max-w-(--cell-size)",
+                  nav: "absolute inset-x-0 top-0 z-20 flex h-10 items-center justify-between",
+                  button_previous: "size-9",
+                  button_next: "size-9",
+                  month_caption: "h-10 px-10",
+                }}
+              />
+              <p className="mt-3 text-xs text-muted-foreground">Highlighted dates include company holidays and weekly offs.</p>
+            </div>
           </CardContent>
         </Card>
         <div className="space-y-4">
