@@ -16,6 +16,7 @@ import { formatDuration, summarizeAttendance } from "@/lib/attendance/calculatio
 import { getDepartmentName, getDesignationName, getReportingPersonName, toLiveStatus } from "@/lib/lookups";
 import { remainingPaidDays, YEARLY_PAID_LEAVE_TOTAL, YEARLY_PAID_LEAVES } from "@/lib/leave/policy";
 import { documentService } from "@/lib/services/documentService";
+import { PayslipActions } from "@/components/payroll/payslip-actions";
 import { payrollService } from "@/lib/services/payrollService";
 import { useDataStore } from "@/lib/stores/data-store";
 import { currency, documentTypeLabel, employmentTypeLabel, formatDate, formatPeriod, formatTime, initials, leaveTypeLabel } from "@/lib/utils/format";
@@ -182,7 +183,9 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
           ))}
         </TabsContent>
         <TabsContent value="payroll" className="space-y-3">
-          {payroll.map((item) => (
+          {[...payroll]
+            .sort((a, b) => b.period.localeCompare(a.period))
+            .map((item) => (
             <Card key={item.id}>
               <CardContent className="grid gap-2 p-5 text-sm sm:grid-cols-2">
                 <Info label="Period" value={formatPeriod(item.period)} />
@@ -191,6 +194,9 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
                 <Info label="Gross" value={currency(item.grossSalary)} />
                 <Info label="Deductions" value={currency(item.deductions)} />
                 <Info label="Net" value={currency(item.netSalary)} />
+                <div className="sm:col-span-2">
+                  <PayslipActions data={data} record={item} employee={employee} />
+                </div>
               </CardContent>
             </Card>
           ))}

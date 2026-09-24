@@ -25,7 +25,7 @@ const LABELS: Record<string, string> = {
   "working-hours": "Working Hours",
   breaks: "Breaks",
   compliance: "9-Hour Compliance",
-  payroll: "Payroll",
+  payroll: "Salary slips",
   announcements: "Announcements",
   notifications: "Notifications",
   documents: "Documents",

@@ -20,6 +20,7 @@ import type {
   User,
 } from "@/types";
 import { REQUIRED_DAILY_HOURS } from "@/types";
+import { AGENCY } from "@/lib/constants";
 import { remainingFromApproved } from "@/lib/leave/policy";
 import { buildPayrollHistory } from "@/lib/payroll/record";
 
@@ -70,12 +71,12 @@ function attendance(
 export const TODAY = "2026-09-22";
 
 export const settings: CompanySettings = {
-  companyName: "Web Create Hub",
-  tagline: "Digital Solutions",
-  email: "hr@webcreatehub.com",
-  phone: "+91 98765 43210",
-  address: "Pune, Maharashtra, India",
-  website: "https://webcreatehub.com",
+  companyName: AGENCY.name,
+  tagline: AGENCY.tagline,
+  email: AGENCY.email,
+  phone: AGENCY.phone,
+  address: AGENCY.address,
+  website: AGENCY.website,
   defaultDailyHours: REQUIRED_DAILY_HOURS,
   workStartTime: "09:30",
   lateAfterMinutes: 10,

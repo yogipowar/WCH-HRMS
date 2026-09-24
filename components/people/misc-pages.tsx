@@ -33,18 +33,21 @@ import { CORE_WORK_DAYS, DEFAULT_SATURDAY_OFF_WEEKS, SATURDAY_WEEKS } from "@/ty
 import { NativeSelect } from "@/components/ui/native-select";
 import { formDialogClass, formFieldControlClass, formGridClass, formWideClass } from "@/lib/ui/form-styles";
 import { AppearanceThemePanel } from "@/components/layout/theme-picker";
+import { PayslipActions } from "@/components/payroll/payslip-actions";
 
 export function PayrollPage() {
   const user = useAuthStore((state) => state.user);
   const data = useDataStore();
   const isAdmin = user?.role === "MANAGEMENT";
   const employee = getEmployeeByUser(data, user?.id ?? "");
-  const [period, setPeriod] = useState(payrollService.getCurrentPeriod());
+  const [period, setPeriod] = useState(isAdmin ? payrollService.getCurrentPeriod() : "all");
   const [departmentId, setDepartmentId] = useState("all");
   const [status, setStatus] = useState("all");
 
   const allRecords = data.payrollRecords;
-  const source = isAdmin ? allRecords : allRecords.filter((item) => item.employeeId === employee?.id);
+  const source = (isAdmin ? allRecords : allRecords.filter((item) => item.employeeId === employee?.id))
+    .slice()
+    .sort((a, b) => b.period.localeCompare(a.period) || a.employeeId.localeCompare(b.employeeId));
   const periods = useMemo(
     () => [...new Set(source.map((item) => item.period))].sort((a, b) => b.localeCompare(a)),
     [source],
@@ -63,11 +66,18 @@ export function PayrollPage() {
   }, [data.employees, departmentId, isAdmin, period, source, status]);
 
   const columns: DataTableColumn<PayrollRecord>[] = [
-    { id: "employee", header: "Employee", accessor: (row) => getEmployeeName(data, row.employeeId), cell: (row) => (
-      <Link href={`/employees/${row.employeeId}`} className="font-medium hover:text-primary">
-        {getEmployeeName(data, row.employeeId)}
-      </Link>
-    ) },
+    ...(isAdmin
+      ? [{
+          id: "employee",
+          header: "Employee",
+          accessor: (row: PayrollRecord) => getEmployeeName(data, row.employeeId),
+          cell: (row: PayrollRecord) => (
+            <Link href={`/employees/${row.employeeId}`} className="font-medium hover:text-primary">
+              {getEmployeeName(data, row.employeeId)}
+            </Link>
+          ),
+        }]
+      : []),
     { id: "period", header: "Period", accessor: (row) => row.period, cell: (row) => formatPeriod(row.period) },
     { id: "basic", header: "Basic", cell: (row) => currency(row.basicSalary) },
     { id: "gross", header: "Gross", cell: (row) => currency(row.grossSalary) },
@@ -75,16 +85,22 @@ export function PayrollPage() {
     { id: "deductions", header: "Deductions", cell: (row) => currency(row.deductions) },
     { id: "net", header: "Net", cell: (row) => currency(row.netSalary) },
     { id: "status", header: "Status", cell: (row) => row.status },
+    {
+      id: "actions",
+      header: "Salary slip",
+      className: "w-[1%]",
+      cell: (row) => <PayslipActions data={data} record={row} employee={isAdmin ? undefined : employee} />,
+    },
   ];
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Payroll"
+        title={isAdmin ? "Payroll" : "Salary slips"}
         description={
           isAdmin
-            ? "Review the current run and previous monthly payrolls."
-            : "Your salary, allowances, deductions, and payslips."
+            ? "Review the current run and previous monthly payrolls. Open or download a salary slip for any period."
+            : "View and download this month’s salary slip, or choose a previous period."
         }
       />
       <div className="flex flex-wrap gap-3">

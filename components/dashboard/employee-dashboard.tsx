@@ -23,11 +23,16 @@ export function EmployeeDashboard({ employee }: { employee: Employee }) {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={`Hello, ${employee.fullName.split(" ")[0]}`}
-        description={`${getDesignationName(data, employee.designationId)} · ${getDepartmentName(data, employee.departmentId)}`}
-        actions={<LinkButton href="/leave">Apply leave</LinkButton>}
-      />
+      <div className="space-y-3">
+        <PageHeader
+          title={`Hello, ${employee.fullName.split(" ")[0]}`}
+          description={`${getDesignationName(data, employee.designationId)} · ${getDepartmentName(data, employee.departmentId)}`}
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <LinkButton href="/leave">Apply leave</LinkButton>
+          <LinkButton href="/payroll" variant="outline">Salary slips</LinkButton>
+        </div>
+      </div>
       <AttendanceControlCard employeeId={employee.id} />
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="shadow-sm">

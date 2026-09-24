@@ -2,8 +2,21 @@ import type { UserRole } from "@/types";
 
 export const APP_NAME = "HRMS";
 export const COMPANY_NAME = "Web Create Hub";
-export const COMPANY_TAGLINE = "Digital Solutions";
+export const COMPANY_TAGLINE = "Digital Solutions Agency";
 export const APP_SUBTITLE = "Employee & Workforce Management";
+
+export const AGENCY = {
+  name: COMPANY_NAME,
+  tagline: COMPANY_TAGLINE,
+  description:
+    "Web Create Hub designs and develops modern, scalable, user-friendly platforms that combine creativity, technology and strategy.",
+  email: "info@webcreatehub.com",
+  phone: "+91 90757 49397",
+  hours: "Mon - Sat: 09:00 AM - 6:00 PM",
+  address: "2nd Floor, Shobha Apartment, Backside of Naik Masale, Ruikar Colony, Kolhapur, 416005",
+  website: "https://webcreatehub.com",
+  city: "Kolhapur",
+} as const;
 export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 export const LOGO_PATH = `${BASE_PATH}/logo/web-create-hub.png`;
 export const FAVICON_PATH = `${BASE_PATH}/logo/Favicon.png`;
@@ -45,6 +58,7 @@ export const EMPLOYEE_NAV: AppNavItem[] = [
   { title: "My Leaves", href: "/leave", icon: "CalendarDays" },
   { title: "Holidays", href: "/holidays", icon: "Palmtree" },
   { title: "Documents", href: "/documents", icon: "FileText" },
+  { title: "Salary slips", href: "/payroll", icon: "Wallet" },
   { title: "Notifications", href: "/notifications", icon: "Bell" },
   { title: "My Profile", href: "/profile", icon: "UserRound" },
 ];
