@@ -3,9 +3,10 @@
 import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { EmployeeForm } from "@/components/employees/employee-form";
+import { AttendanceHistoryList } from "@/components/attendance/attendance-history-list";
 import { AttendanceTimeline } from "@/components/attendance/attendance-timeline";
 import { PageHeader } from "@/components/shared/page-header";
-import { ActiveBadge, AttendanceStatusBadge, LeaveStatusBadge, LiveStatusBadge } from "@/components/shared/status-badge";
+import { ActiveBadge, LeaveStatusBadge, LiveStatusBadge } from "@/components/shared/status-badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LinkButton } from "@/components/shared/link-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,7 +24,9 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   const employee = data.employees.find((item) => item.id === employeeId);
   const account = data.users.find((item) => item.id === employee?.userId);
   const today = attendanceFor(data, employeeId);
-  const history = data.attendanceRecords.filter((item) => item.employeeId === employeeId).slice(-8).reverse();
+  const history = [...data.attendanceRecords]
+    .filter((item) => item.employeeId === employeeId)
+    .sort((a, b) => b.date.localeCompare(a.date));
   const leaves = data.leaveRequests.filter((item) => item.employeeId === employeeId);
   const documents = data.documents.filter((item) => item.employeeId === employeeId);
   const payroll = payrollService.getByEmployee(employeeId);
@@ -109,7 +112,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="attendance" className="grid gap-4 lg:grid-cols-2">
+        <TabsContent value="attendance" className="space-y-4">
           <Card>
             <CardHeader><CardTitle className="text-base">Today</CardTitle></CardHeader>
             <CardContent>
@@ -125,17 +128,13 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
               )}
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader><CardTitle className="text-base">Recent history</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              {history.map((item) => (
-                <div key={item.id} className="flex items-center justify-between text-sm">
-                  <span>{formatDate(item.date)}</span>
-                  <AttendanceStatusBadge status={item.status} />
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-base font-semibold">Attendance history</h2>
+              <LinkButton href="/attendance/history" size="sm" variant="outline">All history</LinkButton>
+            </div>
+            <AttendanceHistoryList records={history.slice(0, 14)} />
+          </div>
         </TabsContent>
         <TabsContent value="hours">
           <Card>
