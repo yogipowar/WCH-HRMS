@@ -6,6 +6,7 @@ export const COMPANY_TAGLINE = "Digital Solutions";
 export const APP_SUBTITLE = "Employee & Workforce Management";
 export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 export const LOGO_PATH = `${BASE_PATH}/logo/web-create-hub.png`;
+export const FAVICON_PATH = `${BASE_PATH}/logo/Favicon.png`;
 
 export const STORAGE_KEYS = {
   auth: "wch-hrms.auth",

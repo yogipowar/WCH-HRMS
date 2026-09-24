@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { Inter } from "next/font/google";
 import { AppProviders } from "@/components/providers/app-providers";
-import { APP_NAME, APP_SUBTITLE, COMPANY_NAME } from "@/lib/constants";
+import { APP_NAME, APP_SUBTITLE, COMPANY_NAME, FAVICON_PATH } from "@/lib/constants";
 import "./globals.css";
 
 const inter = Inter({
@@ -16,6 +16,10 @@ export const metadata: Metadata = {
     template: `%s · ${COMPANY_NAME} ${APP_NAME}`,
   },
   description: APP_SUBTITLE,
+  icons: {
+    icon: [{ url: FAVICON_PATH, type: "image/png" }],
+    apple: FAVICON_PATH,
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

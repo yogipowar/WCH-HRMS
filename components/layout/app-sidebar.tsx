@@ -22,7 +22,8 @@ export function AppSidebar({ role }: { role: UserRole }) {
       <div className={cn("flex h-16 items-center border-b", collapsed ? "justify-center px-2" : "gap-2 px-3")}>
         <BrandLogo
           priority
-          className={cn("max-h-10", collapsed ? "max-w-[40px]" : "max-w-[188px]")}
+          compact={collapsed}
+          className={collapsed ? "size-9" : "max-h-10 max-w-[188px]"}
         />
         {collapsed ? null : (
           <Button
