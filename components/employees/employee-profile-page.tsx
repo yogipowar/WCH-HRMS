@@ -9,11 +9,13 @@ import { PageHeader } from "@/components/shared/page-header";
 import { ActiveBadge, LeaveStatusBadge, LiveStatusBadge } from "@/components/shared/status-badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LinkButton } from "@/components/shared/link-button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDuration, summarizeAttendance } from "@/lib/attendance/calculations";
 import { getDepartmentName, getDesignationName, getReportingPersonName, toLiveStatus } from "@/lib/lookups";
 import { remainingPaidDays, YEARLY_PAID_LEAVE_TOTAL, YEARLY_PAID_LEAVES } from "@/lib/leave/policy";
+import { documentService } from "@/lib/services/documentService";
 import { payrollService } from "@/lib/services/payrollService";
 import { useDataStore } from "@/lib/stores/data-store";
 import { currency, documentTypeLabel, employmentTypeLabel, formatDate, formatPeriod, formatTime, initials, leaveTypeLabel } from "@/lib/utils/format";
@@ -159,9 +161,23 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
         </TabsContent>
         <TabsContent value="documents" className="space-y-3">
           {documents.map((item) => (
-            <div key={item.id} className="rounded-lg border p-3 text-sm">
-              <p className="font-medium">{item.name}</p>
-              <p className="text-muted-foreground">{documentTypeLabel(item.type)} · {item.fileName}</p>
+            <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">
+              <div>
+                <p className="font-medium">{item.name}</p>
+                <p className="text-muted-foreground">{documentTypeLabel(item.type)} · {item.fileName}</p>
+              </div>
+              {item.hasFile ? (
+                <a
+                  href={documentService.documentFileHref(item.id)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  View
+                </a>
+              ) : (
+                <span className="text-muted-foreground">No file</span>
+              )}
             </div>
           ))}
         </TabsContent>

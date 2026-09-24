@@ -36,9 +36,29 @@ export async function getPool(): Promise<Pool> {
   if (!schemaReady) {
     const schema = fs.readFileSync(path.join(process.cwd(), "backend/schema.sql"), "utf8");
     await pool.query(schema);
+    await ensureDocumentFileColumns(pool);
     schemaReady = true;
   }
   return pool;
+}
+
+let documentColumnsReady = false;
+
+export async function ensureDocumentFileColumns(db?: Pool) {
+  if (documentColumnsReady) return;
+  const pool = db ?? (await getPool());
+  const [columns] = await pool.query<RowDataPacket[]>(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'documents'`,
+  );
+  const names = new Set(columns.map((row) => String(row.COLUMN_NAME)));
+  if (!names.has("mime_type")) {
+    await pool.query("ALTER TABLE documents ADD COLUMN mime_type VARCHAR(128) NULL");
+  }
+  if (!names.has("file_data")) {
+    await pool.query("ALTER TABLE documents ADD COLUMN file_data LONGBLOB NULL");
+  }
+  documentColumnsReady = true;
 }
 
 export async function query<T extends RowDataPacket>(sql: string, params: unknown[] = []) {

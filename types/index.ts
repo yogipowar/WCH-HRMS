@@ -289,6 +289,8 @@ export interface EmployeeDocument {
   expiryDate: string | null;
   status: DocumentStatus;
   uploadedAt: string;
+  mimeType?: string | null;
+  hasFile: boolean;
 }
 
 export interface PayrollRecord {

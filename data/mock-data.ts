@@ -515,15 +515,15 @@ export const notifications: Notification[] = [
 ];
 
 export const documents: EmployeeDocument[] = [
-  { id: "doc-001", employeeId: "emp-001", type: "OFFER_LETTER", name: "Offer Letter", fileName: "yogesh-offer-letter.pdf", expiryDate: null, status: "ACTIVE", uploadedAt: "2024-02-01" },
-  { id: "doc-002", employeeId: "emp-001", type: "ID_PROOF", name: "Aadhaar Card", fileName: "yogesh-aadhaar.pdf", expiryDate: null, status: "ACTIVE", uploadedAt: "2024-02-01" },
-  { id: "doc-003", employeeId: "emp-001", type: "RESUME", name: "Resume", fileName: "yogesh-resume.pdf", expiryDate: null, status: "ACTIVE", uploadedAt: "2024-01-28" },
-  { id: "doc-004", employeeId: "emp-002", type: "OFFER_LETTER", name: "Offer Letter", fileName: "aisha-offer-letter.pdf", expiryDate: null, status: "ACTIVE", uploadedAt: "2023-11-15" },
-  { id: "doc-005", employeeId: "emp-002", type: "CONTRACT", name: "Employment Contract", fileName: "aisha-contract.pdf", expiryDate: "2026-11-15", status: "ACTIVE", uploadedAt: "2023-11-15" },
-  { id: "doc-006", employeeId: "emp-013", type: "RESUME", name: "Internship Resume", fileName: "rahul-resume.pdf", expiryDate: null, status: "ACTIVE", uploadedAt: "2026-01-06" },
-  { id: "doc-007", employeeId: "emp-013", type: "CERTIFICATE", name: "College ID", fileName: "rahul-college-id.pdf", expiryDate: "2026-12-31", status: "ACTIVE", uploadedAt: "2026-01-06" },
-  { id: "doc-008", employeeId: "emp-005", type: "ID_PROOF", name: "PAN Card", fileName: "vikram-pan.pdf", expiryDate: null, status: "ACTIVE", uploadedAt: "2023-08-21" },
-  { id: "doc-009", employeeId: "emp-012", type: "OFFER_LETTER", name: "Offer Letter", fileName: "fatima-offer-letter.pdf", expiryDate: null, status: "PENDING", uploadedAt: "2025-01-13" },
+  { id: "doc-001", employeeId: "emp-001", type: "OFFER_LETTER", name: "Offer Letter", fileName: "yogesh-offer-letter.pdf", expiryDate: null, status: "ACTIVE", uploadedAt: "2024-02-01", hasFile: false },
+  { id: "doc-002", employeeId: "emp-001", type: "ID_PROOF", name: "Aadhaar Card", fileName: "yogesh-aadhaar.pdf", expiryDate: null, status: "ACTIVE", uploadedAt: "2024-02-01", hasFile: false },
+  { id: "doc-003", employeeId: "emp-001", type: "RESUME", name: "Resume", fileName: "yogesh-resume.pdf", expiryDate: null, status: "ACTIVE", uploadedAt: "2024-01-28", hasFile: false },
+  { id: "doc-004", employeeId: "emp-002", type: "OFFER_LETTER", name: "Offer Letter", fileName: "aisha-offer-letter.pdf", expiryDate: null, status: "ACTIVE", uploadedAt: "2023-11-15", hasFile: false },
+  { id: "doc-005", employeeId: "emp-002", type: "CONTRACT", name: "Employment Contract", fileName: "aisha-contract.pdf", expiryDate: "2026-11-15", status: "ACTIVE", uploadedAt: "2023-11-15", hasFile: false },
+  { id: "doc-006", employeeId: "emp-013", type: "RESUME", name: "Internship Resume", fileName: "rahul-resume.pdf", expiryDate: null, status: "ACTIVE", uploadedAt: "2026-01-06", hasFile: false },
+  { id: "doc-007", employeeId: "emp-013", type: "CERTIFICATE", name: "College ID", fileName: "rahul-college-id.pdf", expiryDate: "2026-12-31", status: "ACTIVE", uploadedAt: "2026-01-06", hasFile: false },
+  { id: "doc-008", employeeId: "emp-005", type: "ID_PROOF", name: "PAN Card", fileName: "vikram-pan.pdf", expiryDate: null, status: "ACTIVE", uploadedAt: "2023-08-21", hasFile: false },
+  { id: "doc-009", employeeId: "emp-012", type: "OFFER_LETTER", name: "Offer Letter", fileName: "fatima-offer-letter.pdf", expiryDate: null, status: "PENDING", uploadedAt: "2025-01-13", hasFile: false },
 ];
 
 export const payrollRecords: PayrollRecord[] = buildPayrollHistory(employees);

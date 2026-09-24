@@ -2,7 +2,8 @@ import bcrypt from "bcryptjs";
 import type { RowDataPacket } from "mysql2";
 import { settings as defaultSettings } from "@/data/mock-data";
 import type { AppData } from "@/data/mock-data";
-import { execute, query } from "@/lib/server/db";
+import { createId } from "@/lib/lookups";
+import { ensureDocumentFileColumns, execute, query } from "@/lib/server/db";
 import { clearTokenCookie, signToken, tokenCookie, tokenFromRequest, verifyToken } from "@/lib/server/auth";
 import type {
   Announcement,
@@ -10,6 +11,7 @@ import type {
   CompanySettings,
   Department,
   Designation,
+  DocumentType,
   Employee,
   EmployeeDocument,
   Holiday,
@@ -19,6 +21,7 @@ import type {
   PayrollRecord,
   User,
 } from "@/types";
+import { DOCUMENT_TYPES } from "@/types";
 
 type Json = Record<string, unknown>;
 
@@ -188,6 +191,8 @@ function mapDocument(row: RowDataPacket): EmployeeDocument {
     expiryDate: row.expiry_date ? dateOnly(row.expiry_date) : null,
     status: row.status,
     uploadedAt: dateOnly(row.uploaded_at),
+    mimeType: row.mime_type ?? null,
+    hasFile: bool(row.has_file),
   };
 }
 
@@ -207,6 +212,7 @@ function mapPayroll(row: RowDataPacket): PayrollRecord {
 }
 
 export async function loadBootstrap(): Promise<AppData> {
+  await ensureDocumentFileColumns();
   const [
     users,
     employees,
@@ -232,7 +238,12 @@ export async function loadBootstrap(): Promise<AppData> {
     query("SELECT * FROM holidays"),
     query("SELECT * FROM notifications"),
     query("SELECT * FROM announcements"),
-    query("SELECT * FROM documents"),
+    query(
+      `SELECT id, employee_id, type, name, file_name, expiry_date, status, uploaded_at, mime_type,
+              (file_data IS NOT NULL AND OCTET_LENGTH(file_data) > 0) AS has_file
+       FROM documents
+       ORDER BY uploaded_at DESC, id DESC`,
+    ),
     query("SELECT * FROM payroll_records"),
     query("SELECT payload FROM settings WHERE id = 1"),
   ]);
@@ -407,6 +418,127 @@ function jsonResponse(status: number, payload: unknown, extraHeaders: Record<str
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       ...extraHeaders,
+    },
+  });
+}
+
+const DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
+const DOCUMENT_ALLOWED_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]);
+
+async function linkedEmployeeId(user: User) {
+  if (user.employeeId) return user.employeeId;
+  const rows = await query("SELECT id FROM employees WHERE user_id = ?", [user.id]);
+  return rows[0]?.id ? String(rows[0].id) : null;
+}
+
+function isDocumentType(value: string): value is DocumentType {
+  return (DOCUMENT_TYPES as readonly string[]).includes(value);
+}
+
+function safeDownloadName(fileName: string) {
+  return fileName.replace(/["\r\n]/g, "").trim() || "document";
+}
+
+async function createUploadedDocument(request: Request) {
+  await ensureDocumentFileColumns();
+  const contentType = request.headers.get("content-type") ?? "";
+  if (!contentType.includes("multipart/form-data")) {
+    return jsonResponse(400, { error: "Upload a document file." });
+  }
+
+  const form = await request.formData();
+  const file = form.get("file");
+  const employeeId = String(form.get("employeeId") || "").trim();
+  const name = String(form.get("name") || "").trim();
+  const typeValue = String(form.get("type") || "OTHER");
+  const expiryDate = String(form.get("expiryDate") || "").trim() || null;
+
+  if (!(file instanceof File) || file.size === 0) {
+    return jsonResponse(400, { error: "Choose a document file to upload." });
+  }
+  if (file.size > DOCUMENT_MAX_BYTES) {
+    return jsonResponse(400, { error: "Document must be 10 MB or smaller." });
+  }
+  if (file.type && !DOCUMENT_ALLOWED_TYPES.has(file.type)) {
+    return jsonResponse(400, { error: "Upload a PDF, Word document, or image." });
+  }
+  if (!employeeId || !name) {
+    return jsonResponse(400, { error: "Employee and document name are required." });
+  }
+  if (!isDocumentType(typeValue)) {
+    return jsonResponse(400, { error: "Choose a valid document type." });
+  }
+
+  const employees = await query("SELECT id FROM employees WHERE id = ?", [employeeId]);
+  if (!employees[0]) {
+    return jsonResponse(400, { error: "Employee not found." });
+  }
+
+  const item: EmployeeDocument = {
+    id: createId("doc"),
+    employeeId,
+    type: typeValue,
+    name,
+    fileName: file.name || `${name.replace(/\s+/g, "-").toLowerCase()}.pdf`,
+    expiryDate,
+    status: "ACTIVE",
+    uploadedAt: new Date().toISOString().slice(0, 10),
+    mimeType: file.type || "application/octet-stream",
+    hasFile: true,
+  };
+
+  await execute(
+    `INSERT INTO documents (id, employee_id, type, name, file_name, expiry_date, status, uploaded_at, mime_type, file_data)
+     VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    [
+      item.id,
+      item.employeeId,
+      item.type,
+      item.name,
+      item.fileName,
+      item.expiryDate,
+      item.status,
+      item.uploadedAt,
+      item.mimeType,
+      Buffer.from(await file.arrayBuffer()),
+    ],
+  );
+
+  return jsonResponse(200, item);
+}
+
+async function serveDocumentFile(user: User, documentId: string) {
+  await ensureDocumentFileColumns();
+  const rows = await query(
+    "SELECT employee_id, file_name, mime_type, file_data FROM documents WHERE id = ?",
+    [documentId],
+  );
+  const row = rows[0];
+  if (!row || !row.file_data) {
+    return jsonResponse(404, { error: "Document file not found." });
+  }
+
+  if (user.role !== "MANAGEMENT") {
+    const employeeId = await linkedEmployeeId(user);
+    if (!employeeId || row.employee_id !== employeeId) {
+      return jsonResponse(403, { error: "You can only view your own documents." });
+    }
+  }
+
+  const bytes = Buffer.isBuffer(row.file_data) ? row.file_data : Buffer.from(row.file_data);
+  return new Response(bytes, {
+    status: 200,
+    headers: {
+      "Content-Type": String(row.mime_type || "application/octet-stream"),
+      "Content-Disposition": `inline; filename="${safeDownloadName(String(row.file_name))}"`,
+      "Cache-Control": "private, no-store",
     },
   });
 }
@@ -631,14 +763,15 @@ export async function handleApiRequest(request: Request, parts: string[]) {
       return jsonResponse(200, { ok: true });
     }
 
+    if (parts[0] === "documents" && parts[1] && parts[2] === "file" && request.method === "GET") {
+      return serveDocumentFile(user, parts[1]);
+    }
+
     if (parts[0] === "documents" && request.method === "POST") {
-      const item = (await request.json()) as EmployeeDocument;
-      await execute(
-        `INSERT INTO documents (id, employee_id, type, name, file_name, expiry_date, status, uploaded_at)
-         VALUES (?,?,?,?,?,?,?,?)`,
-        [item.id, item.employeeId, item.type, item.name, item.fileName, item.expiryDate, item.status, item.uploadedAt],
-      );
-      return jsonResponse(200, item);
+      if (user.role !== "MANAGEMENT") {
+        return jsonResponse(403, { error: "Only administrators can upload documents." });
+      }
+      return createUploadedDocument(request);
     }
 
     if (parts[0] === "notifications" && parts[1] === "read-all" && request.method === "POST") {

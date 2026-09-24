@@ -1,5 +1,5 @@
 import type { AppData } from "@/data/mock-data";
-import type { User } from "@/types";
+import type { EmployeeDocument, User } from "@/types";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "");
 
@@ -23,7 +23,7 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
-  if (init.body && !headers.has("Content-Type")) {
+  if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
   if (memoryToken) {
@@ -101,6 +101,9 @@ export const api = {
   },
   createDocument(body: unknown) {
     return request("/api/documents", { method: "POST", body: JSON.stringify(body) });
+  },
+  uploadDocument(body: FormData) {
+    return request<EmployeeDocument>("/api/documents", { method: "POST", body });
   },
   markNotificationRead(id: string) {
     return request(`/api/notifications/${id}`, { method: "PATCH" });

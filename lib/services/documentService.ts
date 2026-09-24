@@ -1,7 +1,7 @@
 import { api } from "@/lib/api/client";
-import { createId } from "@/lib/lookups";
+import { BASE_PATH } from "@/lib/constants";
 import { getData, updateData } from "@/lib/stores/data-store";
-import type { EmployeeDocument } from "@/types";
+import type { DocumentType, EmployeeDocument } from "@/types";
 
 export const documentService = {
   getDocuments() {
@@ -10,14 +10,28 @@ export const documentService = {
   getByEmployee(employeeId: string) {
     return getData().documents.filter((item) => item.employeeId === employeeId);
   },
-  createDocument(input: Omit<EmployeeDocument, "id" | "uploadedAt">) {
-    const document: EmployeeDocument = {
-      ...input,
-      id: createId("doc"),
-      uploadedAt: new Date().toISOString().slice(0, 10),
-    };
+  documentFileHref(id: string) {
+    return `${BASE_PATH}/api/documents/${id}/file`;
+  },
+  async uploadDocument(input: {
+    employeeId: string;
+    type: DocumentType;
+    name: string;
+    expiryDate: string | null;
+    file: File;
+  }) {
+    const body = new FormData();
+    body.append("employeeId", input.employeeId);
+    body.append("type", input.type);
+    body.append("name", input.name);
+    if (input.expiryDate) {
+      body.append("expiryDate", input.expiryDate);
+    }
+    body.append("file", input.file);
+    const document = await api.uploadDocument(body);
     updateData((data) => ({ documents: [document, ...data.documents] }));
-    void api.createDocument(document);
     return document;
   },
 };
+
+export type { EmployeeDocument };

@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
 import { AnnouncementStatusBadge } from "@/components/shared/status-badge";
 import { DataTable, type DataTableColumn } from "@/components/tables/data-table";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -268,54 +268,110 @@ export function NotificationsPage() {
 export function DocumentsPage() {
   const user = useAuthStore((state) => state.user);
   const data = useDataStore();
+  const isAdmin = user?.role === "MANAGEMENT";
   const employee = user ? getEmployeeByUser(data, user.id) : undefined;
-  const documents =
-    user?.role === "MANAGEMENT" ? data.documents : data.documents.filter((item) => item.employeeId === employee?.id);
+  const documents = isAdmin
+    ? data.documents
+    : data.documents.filter((item) => item.employeeId === employee?.id);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [type, setType] = useState<EmployeeDocument["type"]>("OTHER");
-  const [employeeId, setEmployeeId] = useState(employee?.id ?? data.employees[0]?.id ?? "");
+  const [employeeId, setEmployeeId] = useState(data.employees[0]?.id ?? "");
+  const [expiryDate, setExpiryDate] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const columns: DataTableColumn<EmployeeDocument>[] = [
-    { id: "employee", header: "Employee", cell: (row) => getEmployeeName(data, row.employeeId) },
+    ...(isAdmin
+      ? [{ id: "employee", header: "Employee", cell: (row: EmployeeDocument) => getEmployeeName(data, row.employeeId) }]
+      : []),
     { id: "name", header: "Document", accessor: (row) => row.name, cell: (row) => row.name },
     { id: "type", header: "Type", cell: (row) => documentTypeLabel(row.type) },
     { id: "file", header: "File", cell: (row) => row.fileName },
     { id: "expiry", header: "Expiry", cell: (row) => (row.expiryDate ? formatDate(row.expiryDate) : "—") },
     { id: "status", header: "Status", cell: (row) => row.status },
+    {
+      id: "actions",
+      header: "Action",
+      className: "w-[1%]",
+      cell: (row) =>
+        row.hasFile ? (
+          <a
+            href={documentService.documentFileHref(row.id)}
+            target="_blank"
+            rel="noreferrer"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            View
+          </a>
+        ) : (
+          <span className="text-sm text-muted-foreground">No file</span>
+        ),
+    },
   ];
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Documents"
-        description="Frontend document records. File storage will be added with the backend."
-        actions={<Button onClick={() => setOpen(true)}>Add document record</Button>}
+        description={
+          isAdmin
+            ? "Upload employee documents and open the files assigned to each person."
+            : "View the documents uploaded for you by administration."
+        }
+        actions={
+          isAdmin ? (
+            <Button onClick={() => setOpen(true)}>Upload document</Button>
+          ) : null
+        }
       />
-      <DataTable data={documents} columns={columns} rowKey={(row) => row.id} />
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className={formDialogClass}>
-          <DialogHeader><DialogTitle>Add document</DialogTitle></DialogHeader>
-          <form
-            className={formGridClass}
-            onSubmit={(event) => {
-              event.preventDefault();
-              const selectedEmployeeId = user?.role === "MANAGEMENT" ? employeeId : employee?.id;
-              if (!selectedEmployeeId) return;
-              documentService.createDocument({
-                employeeId: selectedEmployeeId,
-                type,
-                name,
-                fileName: `${name.toLowerCase().replace(/\s+/g, "-")}.pdf`,
-                expiryDate: null,
-                status: "PENDING",
-              });
-              toast.success("Document record added.");
-              setOpen(false);
+      <DataTable
+        data={documents}
+        columns={columns}
+        rowKey={(row) => row.id}
+        emptyTitle="No documents yet"
+        emptyDescription={isAdmin ? "Upload the first employee document." : "No documents have been uploaded for you yet."}
+      />
+      {isAdmin ? (
+        <Dialog
+          open={open}
+          onOpenChange={(next) => {
+            setOpen(next);
+            if (!next) {
               setName("");
-            }}
-          >
-            {user?.role === "MANAGEMENT" ? (
+              setExpiryDate("");
+              setFile(null);
+            }
+          }}
+        >
+          <DialogContent className={formDialogClass}>
+            <DialogHeader><DialogTitle>Upload document</DialogTitle></DialogHeader>
+            <form
+              className={formGridClass}
+              onSubmit={async (event) => {
+                event.preventDefault();
+                if (!employeeId || !file) return;
+                setSaving(true);
+                try {
+                  await documentService.uploadDocument({
+                    employeeId,
+                    type,
+                    name,
+                    expiryDate: expiryDate || null,
+                    file,
+                  });
+                  toast.success("Document uploaded.");
+                  setOpen(false);
+                  setName("");
+                  setExpiryDate("");
+                  setFile(null);
+                } catch (error) {
+                  toast.error(error instanceof Error ? error.message : "Upload failed.");
+                } finally {
+                  setSaving(false);
+                }
+              }}
+            >
               <div>
                 <Label>Employee</Label>
                 <NativeSelect className={formFieldControlClass} value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} required>
@@ -324,28 +380,43 @@ export function DocumentsPage() {
                   ))}
                 </NativeSelect>
               </div>
-            ) : null}
-            <div>
-              <Label>Name</Label>
-              <Input className="mt-1.5" value={name} onChange={(event) => setName(event.target.value)} required />
-            </div>
-            <div>
-              <Label>Type</Label>
-              <NativeSelect className={formFieldControlClass} value={type} onChange={(event) => setType(event.target.value as EmployeeDocument["type"])}>
-                <option value="OFFER_LETTER">Offer letter</option>
-                <option value="ID_PROOF">ID proof</option>
-                <option value="RESUME">Resume</option>
-                <option value="CONTRACT">Contract</option>
-                <option value="CERTIFICATE">Certificate</option>
-                <option value="OTHER">Other</option>
-              </NativeSelect>
-            </div>
-            <div className="flex items-end">
-              <Button type="submit">Save</Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+              <div>
+                <Label>Name</Label>
+                <Input className="mt-1.5" value={name} onChange={(event) => setName(event.target.value)} required />
+              </div>
+              <div>
+                <Label>Type</Label>
+                <NativeSelect className={formFieldControlClass} value={type} onChange={(event) => setType(event.target.value as EmployeeDocument["type"])}>
+                  <option value="OFFER_LETTER">Offer letter</option>
+                  <option value="ID_PROOF">ID proof</option>
+                  <option value="RESUME">Resume</option>
+                  <option value="CONTRACT">Contract</option>
+                  <option value="CERTIFICATE">Certificate</option>
+                  <option value="OTHER">Other</option>
+                </NativeSelect>
+              </div>
+              <div>
+                <Label>Expiry</Label>
+                <Input className="mt-1.5" type="date" value={expiryDate} onChange={(event) => setExpiryDate(event.target.value)} />
+              </div>
+              <div className="md:col-span-2">
+                <Label>File</Label>
+                <Input
+                  className="mt-1.5"
+                  type="file"
+                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp,application/pdf,image/*"
+                  required
+                  onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                />
+                <p className="mt-1.5 text-xs text-muted-foreground">PDF, Word, or image up to 10 MB.</p>
+              </div>
+              <div className="flex items-end">
+                <Button type="submit" disabled={saving || !file}>{saving ? "Uploading…" : "Upload"}</Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </div>
   );
 }

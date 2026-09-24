@@ -136,7 +136,9 @@ CREATE TABLE IF NOT EXISTS documents (
   file_name VARCHAR(255) NOT NULL,
   expiry_date DATE NULL,
   status VARCHAR(32) NOT NULL,
-  uploaded_at DATE NOT NULL
+  uploaded_at DATE NOT NULL,
+  mime_type VARCHAR(128) NULL,
+  file_data LONGBLOB NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS payroll_records (
