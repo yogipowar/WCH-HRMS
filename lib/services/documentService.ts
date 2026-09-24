@@ -1,3 +1,4 @@
+import { api } from "@/lib/api/client";
 import { createId } from "@/lib/lookups";
 import { getData, updateData } from "@/lib/stores/data-store";
 import type { EmployeeDocument } from "@/types";
@@ -16,6 +17,7 @@ export const documentService = {
       uploadedAt: new Date().toISOString().slice(0, 10),
     };
     updateData((data) => ({ documents: [document, ...data.documents] }));
+    void api.createDocument(document);
     return document;
   },
 };

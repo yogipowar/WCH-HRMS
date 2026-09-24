@@ -1,6 +1,7 @@
 "use client";
 
 import { PanelLeft } from "lucide-react";
+import { BrandLogo } from "@/components/brand/logo";
 import { AppBreadcrumbs } from "@/components/layout/app-breadcrumbs";
 import { GlobalSearch } from "@/components/layout/global-search";
 import { MobileNav } from "@/components/layout/mobile-nav";
@@ -13,7 +14,7 @@ import type { User } from "@/types";
 
 interface AppHeaderProps {
   user: User;
-  onLogout: () => void;
+  onLogout: () => void | Promise<void>;
 }
 
 export function AppHeader({ user, onLogout }: AppHeaderProps) {
@@ -24,7 +25,11 @@ export function AppHeader({ user, onLogout }: AppHeaderProps) {
     <header className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur">
       <div className="flex h-16 items-center justify-between gap-3 px-4">
         <div className="flex min-w-0 items-center gap-3">
-          <MobileNav role={user.role} />
+          {user.role === "EMPLOYEE" ? (
+            <BrandLogo priority className="max-h-8 max-w-[168px] lg:hidden" />
+          ) : (
+            <MobileNav role={user.role} />
+          )}
           {collapsed ? (
             <Button
               variant="ghost"

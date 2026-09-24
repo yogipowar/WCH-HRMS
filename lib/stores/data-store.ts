@@ -1,104 +1,50 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import { createSeedData, type AppData } from "@/data/mock-data";
+import { api } from "@/lib/api/client";
 import { isWeeklyOff, resolveWorkPolicy } from "@/lib/attendance/work-calendar";
-import { STORAGE_KEYS } from "@/lib/constants";
-import { buildPayrollRecord, CURRENT_PAYROLL_PERIOD, payrollAmounts } from "@/lib/payroll/record";
-import { defaultLeaveBalance, normalizeLeaveType, remainingFromApproved } from "@/lib/leave/policy";
-import type { CompanySettings, Employee, LeaveBalance, LeaveRequest, User } from "@/types";
+import { defaultLeaveBalance } from "@/lib/leave/policy";
+import type { CompanySettings } from "@/types";
 
 interface DataStore extends AppData {
-  hydrateFromSeed: () => void;
+  ready: boolean;
+  hydrateFromApi: () => Promise<void>;
+  reset: () => void;
   setData: (partial: Partial<AppData>) => void;
 }
 
-export const useDataStore = create<DataStore>()(
-  persist(
-    (set) => ({
-      ...createSeedData(),
-      hydrateFromSeed: () => set(createSeedData()),
-      setData: (partial) => set(partial),
-    }),
-    {
-      name: STORAGE_KEYS.data,
-      partialize: (state) => ({
-        users: state.users,
-        employees: state.employees,
-        departments: state.departments,
-        designations: state.designations,
-        attendanceRecords: state.attendanceRecords,
-        leaveBalances: state.leaveBalances,
-        leaveRequests: state.leaveRequests,
-        holidays: state.holidays,
-        notifications: state.notifications,
-        announcements: state.announcements,
-        documents: state.documents,
-        payrollRecords: state.payrollRecords,
-        settings: state.settings,
-      }),
-      merge: (persistedState, currentState) => {
-        const persisted = (persistedState ?? {}) as Partial<AppData>;
-        const settings: CompanySettings = {
-          ...currentState.settings,
-          ...persisted.settings,
-          ...resolveWorkPolicy({ ...currentState.settings, ...persisted.settings }),
-        };
-        const attendanceRecords = (persisted.attendanceRecords ?? currentState.attendanceRecords).filter(
-          (record) => !isWeeklyOff(record.date, settings),
-        );
-        const employees = (persisted.employees ?? currentState.employees).map((item) =>
-          withEmployeeSalary(item, currentState.employees.find((seed) => seed.id === item.id)),
-        );
-        const users = (persisted.users ?? currentState.users).map((item) =>
-          withUserLogin(item, currentState.users.find((seed) => seed.id === item.id)),
-        );
-        const leaveRequests = (persisted.leaveRequests ?? currentState.leaveRequests).map(withLeaveRequest);
-        const leaveBalanceByEmployee = new Map(
-          (persisted.leaveBalances ?? currentState.leaveBalances).map((item) => [
-            item.employeeId,
-            withLeaveBalance(item, leaveRequests),
-          ]),
-        );
-        for (const employee of employees) {
-          if (!leaveBalanceByEmployee.has(employee.id)) {
-            leaveBalanceByEmployee.set(employee.id, defaultLeaveBalance(employee.id));
-          }
-        }
-        const leaveBalances = [...leaveBalanceByEmployee.values()];
-        const payrollById = new Map(
-          (currentState.payrollRecords ?? []).map((item) => [item.id, item]),
-        );
-        for (const record of persisted.payrollRecords ?? []) {
-          payrollById.set(record.id, record);
-        }
-        for (const employee of employees) {
-          const currentId = `pay-${employee.id}-${CURRENT_PAYROLL_PERIOD}`;
-          const existing = payrollById.get(currentId);
-          payrollById.set(
-            currentId,
-            existing
-              ? { ...existing, ...payrollAmounts(employee) }
-              : buildPayrollRecord(employee, CURRENT_PAYROLL_PERIOD),
-          );
-        }
-        const payrollRecords = [...payrollById.values()];
-        return {
-          ...currentState,
-          ...persisted,
-          settings,
-          attendanceRecords,
-          employees,
-          users,
-          leaveRequests,
-          leaveBalances,
-          payrollRecords,
-        };
-      },
-    },
-  ),
-);
+const empty = createSeedData();
+
+export const useDataStore = create<DataStore>()((set) => ({
+  ...empty,
+  ready: false,
+  hydrateFromApi: async () => {
+    const data = await api.bootstrap();
+    const settings: CompanySettings = {
+      ...empty.settings,
+      ...data.settings,
+      ...resolveWorkPolicy({ ...empty.settings, ...data.settings }),
+    };
+    const employees = data.employees ?? [];
+    const leaveBalanceByEmployee = new Map((data.leaveBalances ?? []).map((item) => [item.employeeId, item]));
+    for (const employee of employees) {
+      if (!leaveBalanceByEmployee.has(employee.id)) {
+        leaveBalanceByEmployee.set(employee.id, defaultLeaveBalance(employee.id));
+      }
+    }
+    set({
+      ...data,
+      settings,
+      employees,
+      attendanceRecords: (data.attendanceRecords ?? []).filter((record) => !isWeeklyOff(record.date, settings)),
+      leaveBalances: [...leaveBalanceByEmployee.values()],
+      ready: true,
+    });
+  },
+  reset: () => set({ ...empty, ready: false }),
+  setData: (partial) => set(partial),
+}));
 
 export function getData(): AppData {
   const state = useDataStore.getState();
@@ -122,47 +68,4 @@ export function getData(): AppData {
 export function updateData(updater: (current: AppData) => Partial<AppData>): void {
   const current = getData();
   useDataStore.getState().setData(updater(current));
-}
-
-function withLeaveRequest(request: LeaveRequest): LeaveRequest {
-  return { ...request, type: normalizeLeaveType(request.type) };
-}
-
-function withLeaveBalance(
-  balance: LeaveBalance & { earned?: number; unpaid?: number; other?: number },
-  requests: LeaveRequest[],
-): LeaveBalance {
-  if (typeof balance.privilege === "number") {
-    return {
-      employeeId: balance.employeeId,
-      casual: balance.casual,
-      sick: balance.sick,
-      privilege: balance.privilege,
-    };
-  }
-  return remainingFromApproved(balance.employeeId, requests);
-}
-
-function withUserLogin(user: User, seed?: User): User {
-  return {
-    ...user,
-    username: user.username || seed?.username || "",
-    password: user.password || seed?.password || "",
-  };
-}
-
-function withEmployeeSalary(employee: Employee, seed?: Employee): Employee {
-  if (typeof employee.basicSalary === "number") {
-    return {
-      ...employee,
-      allowances: employee.allowances ?? 0,
-      deductions: employee.deductions ?? 0,
-    };
-  }
-  return {
-    ...employee,
-    basicSalary: seed?.basicSalary ?? 0,
-    allowances: seed?.allowances ?? 0,
-    deductions: seed?.deductions ?? 0,
-  };
 }

@@ -17,7 +17,7 @@ import type { User } from "@/types";
 
 interface UserMenuProps {
   user: User;
-  onLogout: () => void;
+  onLogout: () => void | Promise<void>;
 }
 
 export function UserMenu({ user, onLogout }: UserMenuProps) {

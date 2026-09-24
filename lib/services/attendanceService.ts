@@ -5,6 +5,7 @@ import {
 } from "@/lib/attendance/calculations";
 import { getNextState, validateAttendanceAction } from "@/lib/attendance/state-machine";
 import { dayKind, weeklyOffReason } from "@/lib/attendance/work-calendar";
+import { api } from "@/lib/api/client";
 import { createId } from "@/lib/lookups";
 import { getData, updateData } from "@/lib/stores/data-store";
 import type {
@@ -176,6 +177,7 @@ function applyAction(
         : [...store.attendanceRecords, next],
     };
   });
+  void api.saveAttendance(next);
 
   return next;
 }

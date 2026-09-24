@@ -48,6 +48,13 @@ export const EMPLOYEE_NAV: AppNavItem[] = [
   { title: "My Profile", href: "/profile", icon: "UserRound" },
 ];
 
+export const EMPLOYEE_MOBILE_TAB_NAV: AppNavItem[] = [
+  { title: "Dashboard", href: "/dashboard", icon: "LayoutDashboard" },
+  { title: "Attendance", href: "/attendance", icon: "Clock3" },
+  { title: "Leaves", href: "/leave", icon: "CalendarDays" },
+  { title: "Documents", href: "/documents", icon: "FileText" },
+];
+
 export const MANAGEMENT_ONLY_PREFIXES = [
   "/employees",
   "/departments",

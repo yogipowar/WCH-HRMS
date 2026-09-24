@@ -1,3 +1,4 @@
+import { api } from "@/lib/api/client";
 import { getData, updateData } from "@/lib/stores/data-store";
 
 export const notificationService = {
@@ -12,6 +13,7 @@ export const notificationService = {
         item.id === id ? { ...item, read: true } : item,
       ),
     }));
+    void api.markNotificationRead(id);
   },
   markAllAsRead(userId: string) {
     updateData((data) => ({
@@ -19,5 +21,6 @@ export const notificationService = {
         item.userId === userId ? { ...item, read: true } : item,
       ),
     }));
+    void api.markAllNotificationsRead(userId);
   },
 };

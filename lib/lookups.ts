@@ -19,6 +19,11 @@ export function getEmployeeName(data: AppData, employeeId: string): string {
 }
 
 export function getEmployeeByUser(data: AppData, userId: string): Employee | undefined {
+  const user = data.users.find((item) => item.id === userId);
+  if (user?.employeeId) {
+    const linked = data.employees.find((item) => item.id === user.employeeId);
+    if (linked) return linked;
+  }
   return data.employees.find((item) => item.userId === userId);
 }
 

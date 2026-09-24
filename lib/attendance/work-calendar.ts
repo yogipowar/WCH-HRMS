@@ -65,6 +65,9 @@ export function weeklyOffReason(value: Date | string, settings: Partial<CompanyS
   }
 
   const name = JS_DAY_TO_WEEKDAY[weekday];
+  if (!name) {
+    return null;
+  }
   if (!policy.workDays.includes(name)) {
     return `${name.charAt(0)}${name.slice(1).toLowerCase()} weekly off`;
   }

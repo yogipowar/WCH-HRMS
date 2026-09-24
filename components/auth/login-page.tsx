@@ -25,9 +25,9 @@ export function LoginPage() {
     defaultValues: { username: "", password: "" },
   });
 
-  function onSubmit(values: LoginFormValues) {
+  async function onSubmit(values: LoginFormValues) {
     setFormError(null);
-    const success = login(values.username, values.password);
+    const success = await login(values.username, values.password, rememberMe);
     if (!success) {
       setFormError("The username or password is incorrect.");
       return;

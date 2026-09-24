@@ -1,3 +1,4 @@
+import { api } from "@/lib/api/client";
 import { getData, updateData } from "@/lib/stores/data-store";
 import { createId } from "@/lib/lookups";
 import { isUsernameTaken } from "@/lib/auth/credentials";
@@ -26,29 +27,28 @@ export const employeeService = {
     }
     const employee: Employee = { ...input, id: createId("emp") };
     const userId = input.userId || createId("user");
+    const savedEmployee = { ...employee, userId };
+    const user = {
+      id: userId,
+      name: input.fullName,
+      email: input.workEmail,
+      phone: input.phone,
+      role: "EMPLOYEE" as const,
+      employeeId: employee.id,
+      avatarUrl: input.avatarUrl,
+      username: login.username.trim(),
+      password: login.password,
+    };
+    const leaveBalance = defaultLeaveBalance(employee.id);
+    const payrollRecord = buildPayrollRecord(savedEmployee);
     updateData((data) => ({
-      employees: [...data.employees, { ...employee, userId }],
-      users: [
-        ...data.users,
-        {
-          id: userId,
-          name: input.fullName,
-          email: input.workEmail,
-          phone: input.phone,
-          role: "EMPLOYEE",
-          employeeId: employee.id,
-          avatarUrl: input.avatarUrl,
-          username: login.username.trim(),
-          password: login.password,
-        },
-      ],
-      leaveBalances: [
-        ...data.leaveBalances,
-        defaultLeaveBalance(employee.id),
-      ],
-      payrollRecords: [...data.payrollRecords, buildPayrollRecord({ ...employee, userId })],
+      employees: [...data.employees, savedEmployee],
+      users: [...data.users, user],
+      leaveBalances: [...data.leaveBalances, leaveBalance],
+      payrollRecords: [...data.payrollRecords, payrollRecord],
     }));
-    return { ...employee, userId };
+    void api.createEmployee({ employee: savedEmployee, user, leaveBalance, payrollRecord });
+    return savedEmployee;
   },
   updateEmployee(id: string, patch: Partial<Employee>, login?: EmployeeLogin) {
     if (login?.username) {
@@ -79,15 +79,19 @@ export const employeeService = {
           password: login?.password || user.password,
         };
       });
-      return {
-        employees,
-        users,
-        payrollRecords: hasCurrent
-          ? data.payrollRecords.map((item) =>
-              item.employeeId === id && item.period === CURRENT_PAYROLL_PERIOD ? { ...item, ...amounts } : item,
-            )
-          : [...data.payrollRecords, buildPayrollRecord(employee)],
-      };
+      const payrollRecords = hasCurrent
+        ? data.payrollRecords.map((item) =>
+            item.employeeId === id && item.period === CURRENT_PAYROLL_PERIOD ? { ...item, ...amounts } : item,
+          )
+        : [...data.payrollRecords, buildPayrollRecord(employee)];
+      const user = users.find((item) => item.id === employee.userId);
+      const payrollRecord = payrollRecords.find(
+        (item) => item.employeeId === id && item.period === CURRENT_PAYROLL_PERIOD,
+      );
+      if (user) {
+        void api.updateEmployee(id, { employee, user, payrollRecord });
+      }
+      return { employees, users, payrollRecords };
     });
   },
   deactivateEmployee(id: string) {

@@ -1,3 +1,4 @@
+import { api } from "@/lib/api/client";
 import { createId } from "@/lib/lookups";
 import { applyLeaveToBalance, defaultLeaveBalance, leaveDaysUsed, paidLeaveKey } from "@/lib/leave/policy";
 import { getData, updateData } from "@/lib/stores/data-store";
@@ -43,6 +44,7 @@ export const leaveService = {
       ...input,
     };
     updateData((data) => ({ leaveRequests: [request, ...data.leaveRequests] }));
+    void api.createLeave(request);
     return request;
   },
   updateLeaveStatus(
@@ -77,6 +79,11 @@ export const leaveService = {
         leaveBalances = data.leaveBalances.map((item) =>
           item.employeeId === current.employeeId ? applyLeaveToBalance(item, current, "restore") : item,
         );
+      }
+      const request = leaveRequests.find((item) => item.id === id);
+      const balance = leaveBalances.find((item) => item.employeeId === current.employeeId);
+      if (request) {
+        void api.updateLeaveStatus(id, { request, balance });
       }
       return { leaveRequests, leaveBalances };
     });
