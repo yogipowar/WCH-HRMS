@@ -1,8 +1,9 @@
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import {
   computeStoredAttendanceMetrics,
   getActiveBreak,
 } from "@/lib/attendance/calculations";
+import { findOpenAttendance } from "@/lib/attendance/session";
 import { getNextState, validateAttendanceAction } from "@/lib/attendance/state-machine";
 import { dayKind, weeklyOffReason } from "@/lib/attendance/work-calendar";
 import { api } from "@/lib/api/client";
@@ -75,6 +76,12 @@ function applyAction(
 ): AttendanceRecord {
   const date = todayDate(now);
   const data = getData();
+  const open = findOpenAttendance(data.attendanceRecords, employeeId);
+  if (action === "CLOCK_IN" && open) {
+    throw new Error(
+      `You are still clocked in from ${format(parseISO(open.date), "dd MMM yyyy")}. Clock out before starting a new day.`,
+    );
+  }
   const kind = dayKind(date, data.settings, data.holidays);
   if (action === "CLOCK_IN" && kind !== "WORKING") {
     const reason =
@@ -84,7 +91,7 @@ function applyAction(
     throw new Error(`Clock-in is not available. ${reason}`);
   }
 
-  const current = recordForDate(employeeId, date);
+  const current = action === "CLOCK_IN" ? recordForDate(employeeId, date) : (open ?? recordForDate(employeeId, date));
 
   const validation = validateAttendanceAction(current, action);
   if (!validation.allowed) {
@@ -190,7 +197,8 @@ export const attendanceService = {
     return getData().attendanceRecords.filter((item) => item.employeeId === employeeId);
   },
   getTodayAttendance(employeeId: string, now = new Date()) {
-    return recordForDate(employeeId, todayDate(now));
+    const open = findOpenAttendance(getData().attendanceRecords, employeeId);
+    return open ?? recordForDate(employeeId, todayDate(now));
   },
   getAttendanceById(id: string) {
     return getData().attendanceRecords.find((item) => item.id === id) ?? null;

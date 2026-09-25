@@ -38,14 +38,14 @@ export function toLiveStatus(
   state: AttendanceState,
   attendanceStatus?: AttendanceStatus,
 ): LiveAttendanceStatus {
-  if (attendanceStatus === "ON_LEAVE") return "ON_LEAVE";
-  if (attendanceStatus === "ABSENT") return "ABSENT";
-  if (attendanceStatus === "WEEKLY_OFF") return "WEEKLY_OFF";
-  if (attendanceStatus === "HOLIDAY") return "HOLIDAY";
   if (state === "WORKING") return "WORKING";
   if (state === "ON_LUNCH_BREAK") return "LUNCH_BREAK";
   if (state === "ON_PERSONAL_BREAK") return "PERSONAL_BREAK";
   if (state === "CLOCKED_OUT") return "COMPLETED";
+  if (attendanceStatus === "ON_LEAVE") return "ON_LEAVE";
+  if (attendanceStatus === "ABSENT") return "ABSENT";
+  if (attendanceStatus === "WEEKLY_OFF") return "WEEKLY_OFF";
+  if (attendanceStatus === "HOLIDAY") return "HOLIDAY";
   return "NOT_CLOCKED_IN";
 }
 

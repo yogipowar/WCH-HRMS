@@ -1,6 +1,7 @@
 import { eachDayOfInterval, format, parseISO, subDays } from "date-fns";
 import type { AppData } from "@/data/mock-data";
 import { summarizeAttendance } from "@/lib/attendance/calculations";
+import { findOpenAttendance } from "@/lib/attendance/session";
 import { dayKind, isPresentAttendance } from "@/lib/attendance/work-calendar";
 import { getDepartmentName } from "@/lib/lookups";
 import type { AttendanceRecord } from "@/types";
@@ -55,6 +56,7 @@ export function departmentAttendance(data: AppData, date: string) {
 }
 
 export function liveAttendanceRows(data: AppData, date: string, now = new Date()) {
+  const liveDate = format(now, "yyyy-MM-dd");
   const kind = dayKind(date, data.settings, data.holidays);
   return data.employees
     .filter((item) => item.status === "ACTIVE")
@@ -62,8 +64,10 @@ export function liveAttendanceRows(data: AppData, date: string, now = new Date()
       const stored = data.attendanceRecords.find(
         (item) => item.employeeId === employee.id && item.date === date,
       );
+      const open = date === liveDate ? findOpenAttendance(data.attendanceRecords, employee.id) : undefined;
       const record =
-        stored?.clockIn || kind === "WORKING"
+        open ??
+        (stored?.clockIn || kind === "WORKING"
           ? stored
           : {
               id: `off-${employee.id}-${date}`,
@@ -80,7 +84,7 @@ export function liveAttendanceRows(data: AppData, date: string, now = new Date()
               breaks: [],
               lateMinutes: 0,
               notes: null,
-            };
+            });
       const summary = record
         ? summarizeAttendance(record, now)
         : summarizeAttendance(

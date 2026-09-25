@@ -51,11 +51,9 @@ export function AttendanceHomePage() {
     );
   }
 
-  const rows = liveAttendanceRows(
-    data,
-    date,
-    date === today ? new Date() : new Date(`${date}T18:00:00`),
-  ).filter((row) => departmentId === "all" || row.employee.departmentId === departmentId);
+  const rows = liveAttendanceRows(data, date, new Date()).filter(
+    (row) => departmentId === "all" || row.employee.departmentId === departmentId,
+  );
 
   return (
     <div className="space-y-4">

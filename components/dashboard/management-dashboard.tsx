@@ -62,7 +62,7 @@ export function ManagementDashboard() {
       ? format(range.from, "yyyy-MM-dd")
       : TODAY;
   const tableRows = useMemo(
-    () => liveAttendanceRows(data, focusDate, focusDate === TODAY ? now : new Date(`${focusDate}T18:00:00`)),
+    () => liveAttendanceRows(data, focusDate, now),
     [data, focusDate, now],
   );
   const present = todayRows.filter((row) => row.record && isPresentAttendance(row.record.status));

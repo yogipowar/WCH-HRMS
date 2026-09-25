@@ -13,13 +13,14 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDuration, summarizeAttendance } from "@/lib/attendance/calculations";
+import { findOpenAttendance } from "@/lib/attendance/session";
 import { getDepartmentName, getDesignationName, getReportingPersonName, toLiveStatus } from "@/lib/lookups";
 import { remainingPaidDays, YEARLY_PAID_LEAVE_TOTAL, YEARLY_PAID_LEAVES } from "@/lib/leave/policy";
 import { documentService } from "@/lib/services/documentService";
 import { PayslipActions } from "@/components/payroll/payslip-actions";
 import { payrollService } from "@/lib/services/payrollService";
 import { useDataStore } from "@/lib/stores/data-store";
-import { currency, documentTypeLabel, employmentTypeLabel, formatDate, formatPeriod, formatTime, initials, leaveTypeLabel } from "@/lib/utils/format";
+import { currency, documentTypeLabel, employmentTypeLabel, formatDate, formatPeriod, formatTime, initials, leaveTypeLabel, todayIsoDate } from "@/lib/utils/format";
 
 export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   const data = useDataStore();
@@ -218,8 +219,10 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
 }
 
 function attendanceFor(data: ReturnType<typeof useDataStore.getState>, employeeId: string) {
-  const today = new Date().toISOString().slice(0, 10);
-  return data.attendanceRecords.find((item) => item.employeeId === employeeId && item.date === today);
+  return (
+    findOpenAttendance(data.attendanceRecords, employeeId) ??
+    data.attendanceRecords.find((item) => item.employeeId === employeeId && item.date === todayIsoDate())
+  );
 }
 
 function InfoCard({ title, value }: { title: string; value: string }) {

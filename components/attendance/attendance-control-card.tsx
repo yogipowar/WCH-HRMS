@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { AttendanceTimeline } from "@/components/attendance/attendance-timeline";
 import { BreakSummary } from "@/components/attendance/break-summary";
@@ -61,13 +61,21 @@ export function AttendanceControlCard({ employeeId }: { employeeId: string }) {
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-sm text-muted-foreground">{format(now, "EEEE, dd MMMM yyyy")}</p>
-          <CardTitle className="mt-1">Today&apos;s attendance</CardTitle>
+          <CardTitle className="mt-1">
+            {record.clockIn && record.date !== format(now, "yyyy-MM-dd")
+              ? "Open attendance"
+              : "Today's attendance"}
+          </CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">
-            {offReason
-              ? offReason
-              : record.clockIn
-                ? `Working since ${formatTime(record.clockIn)}`
-                : "You have not clocked in yet."}
+            {record.clockIn && !record.clockOut
+              ? `Working since ${formatTime(record.clockIn)}${
+                  record.date !== format(now, "yyyy-MM-dd") ? ` · ${format(parseISO(record.date), "dd MMM yyyy")}` : ""
+                }. Hours keep counting until clock out.`
+              : offReason
+                ? offReason
+                : record.clockIn
+                  ? `Working since ${formatTime(record.clockIn)}`
+                  : "You have not clocked in yet."}
           </p>
         </div>
         <LiveStatusBadge status={toLiveStatus(record.state, record.status)} />

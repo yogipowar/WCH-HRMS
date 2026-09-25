@@ -5,7 +5,8 @@ import { ChevronDown } from "lucide-react";
 import { AttendanceTimeline } from "@/components/attendance/attendance-timeline";
 import { AttendanceStatusBadge } from "@/components/shared/status-badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { formatDuration } from "@/lib/attendance/calculations";
+import { formatDuration, summarizeAttendance } from "@/lib/attendance/calculations";
+import { isOpenAttendance } from "@/lib/attendance/session";
 import { getEmployeeName } from "@/lib/lookups";
 import { useDataStore } from "@/lib/stores/data-store";
 import { cn } from "@/lib/utils";
@@ -78,9 +79,7 @@ export function AttendanceHistoryList({
                     <dd>{breakTimes(record, "PERSONAL")}</dd>
                   </div>
                 </dl>
-                <p className="text-xs text-muted-foreground">
-                  Active {formatDuration(record.activeWorkingMinutes)} · Break {formatDuration(record.breakMinutes)}
-                </p>
+                <HistoryHours record={record} />
               </div>
               <ChevronDown className={cn("mt-1 size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
             </button>
@@ -93,5 +92,17 @@ export function AttendanceHistoryList({
         );
       })}
     </div>
+  );
+}
+
+function HistoryHours({ record }: { record: AttendanceRecord }) {
+  const hours = isOpenAttendance(record)
+    ? summarizeAttendance(record)
+    : { activeWorkingMinutes: record.activeWorkingMinutes, breakMinutes: record.breakMinutes };
+  return (
+    <p className="text-xs text-muted-foreground">
+      Active {formatDuration(hours.activeWorkingMinutes)} · Break {formatDuration(hours.breakMinutes)}
+      {isOpenAttendance(record) ? " · Still working" : ""}
+    </p>
   );
 }
