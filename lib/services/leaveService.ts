@@ -1,5 +1,5 @@
 import { api } from "@/lib/api/client";
-import { createId } from "@/lib/lookups";
+import { BASE_PATH } from "@/lib/constants";
 import { applyLeaveToBalance, defaultLeaveBalance, leaveDaysUsed, paidLeaveKey } from "@/lib/leave/policy";
 import { getData, updateData } from "@/lib/stores/data-store";
 import type { LeaveRequest, LeaveStatus, LeaveType } from "@/types";
@@ -17,14 +17,17 @@ export const leaveService = {
   getBalance(employeeId: string) {
     return getData().leaveBalances.find((item) => item.employeeId === employeeId) ?? defaultLeaveBalance(employeeId);
   },
-  createLeaveRequest(input: {
+  leaveAttachmentHref(id: string) {
+    return `${BASE_PATH}/api/leave/${id}/attachment`;
+  },
+  async createLeaveRequest(input: {
     employeeId: string;
     type: LeaveType;
     startDate: string;
     endDate: string;
     isHalfDay: boolean;
     reason: string;
-    attachmentName: string | null;
+    file?: File | null;
   }) {
     const key = paidLeaveKey(input.type);
     if (key) {
@@ -34,17 +37,18 @@ export const leaveService = {
         throw new Error(`Not enough ${key} leave remaining.`);
       }
     }
-    const request: LeaveRequest = {
-      id: createId("leave"),
-      status: "PENDING",
-      rejectionReason: null,
-      reviewedBy: null,
-      reviewedAt: null,
-      createdAt: new Date().toISOString(),
-      ...input,
-    };
+    const body = new FormData();
+    body.append("employeeId", input.employeeId);
+    body.append("type", input.type);
+    body.append("startDate", input.startDate);
+    body.append("endDate", input.isHalfDay ? input.startDate : input.endDate);
+    body.append("isHalfDay", input.isHalfDay ? "true" : "false");
+    body.append("reason", input.reason);
+    if (input.file) {
+      body.append("file", input.file);
+    }
+    const request = await api.createLeave(body);
     updateData((data) => ({ leaveRequests: [request, ...data.leaveRequests] }));
-    void api.createLeave(request);
     return request;
   },
   updateLeaveStatus(

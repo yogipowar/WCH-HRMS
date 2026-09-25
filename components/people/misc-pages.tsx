@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { BrandLogo } from "@/components/brand/logo";
-import { announcementService } from "@/lib/services/announcementService";
+import { announcementService, isAnnouncementVisibleTo } from "@/lib/services/announcementService";
 import { documentService } from "@/lib/services/documentService";
 import { notificationService } from "@/lib/services/notificationService";
 import { payrollService } from "@/lib/services/payrollService";
@@ -27,7 +27,7 @@ import { useDataStore } from "@/lib/stores/data-store";
 import { announcementFormSchema, type AnnouncementFormValues } from "@/lib/validations/announcement";
 import { saturdayWeekLabel, workWeekPolicyLabel } from "@/lib/attendance/work-calendar";
 import { YEARLY_PAID_LEAVE_LABEL } from "@/lib/leave/policy";
-import { currency, documentTypeLabel, formatDate, formatDateTime, formatPeriod } from "@/lib/utils/format";
+import { currency, documentTypeLabel, formatDate, formatDateTime, formatPeriod, todayIsoDate } from "@/lib/utils/format";
 import type { Announcement, EmployeeDocument, PayrollRecord, SaturdayWeek, Weekday } from "@/types";
 import { CORE_WORK_DAYS, DEFAULT_SATURDAY_OFF_WEEKS, SATURDAY_WEEKS } from "@/types";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -148,19 +148,44 @@ export function PayrollPage() {
 
 export function AnnouncementsPage() {
   const user = useAuthStore((state) => state.user);
-  const announcements = useDataStore((state) => state.announcements);
-  const visible = user?.role === "MANAGEMENT" ? announcements : announcements.filter((item) => item.status === "PUBLISHED");
+  const data = useDataStore();
+  const employee = user ? getEmployeeByUser(data, user.id) : undefined;
+  const visible = user
+    ? data.announcements.filter((item) => isAnnouncementVisibleTo(item, user, employee))
+    : [];
   const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<Announcement | null>(null);
+  const [saving, setSaving] = useState(false);
   const form = useForm<AnnouncementFormValues>({
     resolver: zodResolver(announcementFormSchema),
-    defaultValues: { title: "", description: "", audience: "ALL", publishDate: "", status: "DRAFT" },
+    defaultValues: { title: "", description: "", audience: "ALL", publishDate: todayIsoDate(), status: "PUBLISHED" },
   });
+  const audience = form.watch("audience");
 
   const columns: DataTableColumn<Announcement>[] = [
-    { id: "title", header: "Title", accessor: (row) => row.title, cell: (row) => row.title },
+    {
+      id: "title",
+      header: "Title",
+      accessor: (row) => row.title,
+      cell: (row) => (
+        <button type="button" className="text-left font-medium hover:text-primary" onClick={() => setSelected(row)}>
+          {row.title}
+        </button>
+      ),
+    },
     { id: "audience", header: "Audience", cell: (row) => row.audience },
     { id: "date", header: "Publish date", cell: (row) => formatDate(row.publishDate) },
     { id: "status", header: "Status", cell: (row) => <AnnouncementStatusBadge status={row.status} /> },
+    {
+      id: "details",
+      header: "Details",
+      className: "w-[1%]",
+      cell: (row) => (
+        <Button size="sm" variant="outline" onClick={() => setSelected(row)}>
+          View
+        </Button>
+      ),
+    },
     ...(user?.role === "MANAGEMENT"
       ? [
           {
@@ -191,25 +216,41 @@ export function AnnouncementsPage() {
         description="Company-wide updates."
         actions={user?.role === "MANAGEMENT" ? <Button onClick={() => setOpen(true)}>New announcement</Button> : null}
       />
-      <DataTable data={visible} columns={columns} rowKey={(row) => row.id} />
+      <DataTable
+        data={visible}
+        columns={columns}
+        rowKey={(row) => row.id}
+        emptyTitle="No announcements"
+        emptyDescription="Published announcements will appear here."
+      />
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className={formDialogClass}>
           <DialogHeader><DialogTitle>Create announcement</DialogTitle></DialogHeader>
           <form
             className={formGridClass}
-            onSubmit={form.handleSubmit((values) => {
-              announcementService.createAnnouncement({
-                ...values,
-                departmentId: values.departmentId || null,
-                createdBy: user?.id ?? "user-admin",
-              });
-              toast.success("Announcement saved.");
-              setOpen(false);
+            onSubmit={form.handleSubmit(async (values) => {
+              if (!user) return;
+              setSaving(true);
+              try {
+                await announcementService.createAnnouncement({
+                  ...values,
+                  departmentId: values.audience === "DEPARTMENT" ? values.departmentId || null : null,
+                  createdBy: user.id,
+                });
+                toast.success("Announcement published.");
+                form.reset({ title: "", description: "", audience: "ALL", publishDate: todayIsoDate(), status: "PUBLISHED" });
+                setOpen(false);
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : "Could not save announcement.");
+              } finally {
+                setSaving(false);
+              }
             })}
           >
             <div>
               <Label>Title</Label>
               <Input className="mt-1.5" {...form.register("title")} />
+              <FieldError message={form.formState.errors.title?.message} />
             </div>
             <div>
               <Label>Audience</Label>
@@ -220,9 +261,21 @@ export function AnnouncementsPage() {
                 <option value="DEPARTMENT">Department</option>
               </NativeSelect>
             </div>
+            {audience === "DEPARTMENT" ? (
+              <div>
+                <Label>Department</Label>
+                <NativeSelect className={formFieldControlClass} {...form.register("departmentId")}>
+                  <option value="">Select department</option>
+                  {data.departments.map((item) => (
+                    <option key={item.id} value={item.id}>{item.name}</option>
+                  ))}
+                </NativeSelect>
+              </div>
+            ) : null}
             <div>
               <Label>Publish date</Label>
               <Input className="mt-1.5" type="date" {...form.register("publishDate")} />
+              <FieldError message={form.formState.errors.publishDate?.message} />
             </div>
             <div>
               <Label>Status</Label>
@@ -235,15 +288,32 @@ export function AnnouncementsPage() {
             <div className={formWideClass}>
               <Label>Description</Label>
               <Textarea className="mt-1.5" {...form.register("description")} />
+              <FieldError message={form.formState.errors.description?.message} />
             </div>
             <div className="flex items-end">
-              <Button type="submit">Save</Button>
+              <Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
+      <Dialog open={Boolean(selected)} onOpenChange={(next) => !next && setSelected(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{selected?.title}</DialogTitle></DialogHeader>
+          {selected ? (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">{formatDate(selected.publishDate)}</p>
+              <p className="text-sm whitespace-pre-wrap">{selected.description}</p>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p className="mt-1 text-xs text-destructive">{message}</p>;
 }
 
 export function NotificationsPage() {

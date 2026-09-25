@@ -1,5 +1,5 @@
 import type { AppData } from "@/data/mock-data";
-import type { EmployeeDocument, User } from "@/types";
+import type { EmployeeDocument, LeaveRequest, User } from "@/types";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "");
 
@@ -84,8 +84,8 @@ export const api = {
   deleteHoliday(id: string) {
     return request(`/api/holidays/${id}`, { method: "DELETE" });
   },
-  createLeave(body: unknown) {
-    return request("/api/leave", { method: "POST", body: JSON.stringify(body) });
+  createLeave(body: FormData) {
+    return request<LeaveRequest>("/api/leave", { method: "POST", body });
   },
   updateLeaveStatus(id: string, body: unknown) {
     return request(`/api/leave/${id}/status`, { method: "PATCH", body: JSON.stringify(body) });

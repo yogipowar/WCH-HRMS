@@ -262,9 +262,9 @@ export function ManagementDashboard() {
                 .filter((item) => item.status === "PUBLISHED")
                 .slice(0, 2)
                 .map((item) => (
-                  <p key={item.id} className="text-sm">
+                  <Link key={item.id} href="/announcements" className="block text-sm hover:text-primary">
                     {item.title}
-                  </p>
+                  </Link>
                 ))}
             </div>
           </CardContent>

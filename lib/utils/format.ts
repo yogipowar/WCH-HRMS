@@ -11,6 +11,9 @@ import type {
 
 export function formatDate(value: string | Date, pattern = "dd MMM yyyy"): string {
   const date = typeof value === "string" ? parseISO(value) : value;
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
   return format(date, pattern);
 }
 
@@ -24,6 +27,9 @@ export function formatTime(value: string | Date | null, pattern = "hh:mm a"): st
 
 export function formatDateTime(value: string | Date, pattern = "dd MMM yyyy, hh:mm a"): string {
   const date = typeof value === "string" ? parseISO(value) : value;
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
   return format(date, pattern);
 }
 

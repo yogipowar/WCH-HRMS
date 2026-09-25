@@ -2,15 +2,17 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Eye } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmationDialog } from "@/components/shared/confirmation-dialog";
 import { DatePicker } from "@/components/shared/date-range-picker";
 import { PageHeader } from "@/components/shared/page-header";
 import { LeaveStatusBadge } from "@/components/shared/status-badge";
 import { DataTable, type DataTableColumn } from "@/components/tables/data-table";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +20,7 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { formFieldControlClass, formGridClass, formWideClass } from "@/lib/ui/form-styles";
 import { remainingPaidDays, YEARLY_PAID_LEAVE_LABEL, YEARLY_PAID_LEAVE_TOTAL, YEARLY_PAID_LEAVES } from "@/lib/leave/policy";
-import { daysBetweenInclusive, formatDate, leaveTypeLabel } from "@/lib/utils/format";
+import { daysBetweenInclusive, formatDate, formatDateTime, leaveTypeLabel, todayIsoDate } from "@/lib/utils/format";
 import { getDepartmentName, getEmployeeByUser, getEmployeeName } from "@/lib/lookups";
 import { leaveService } from "@/lib/services/leaveService";
 import { useAuthStore } from "@/lib/stores/auth-store";
@@ -39,38 +41,75 @@ export function LeavePage() {
 }
 
 function EmployeeLeave({ employeeId }: { employeeId: string }) {
+  const router = useRouter();
   const data = useDataStore();
   const balance = leaveService.getBalance(employeeId);
-  const requests = data.leaveRequests.filter((item) => item.employeeId === employeeId);
+  const today = todayIsoDate();
+  const requests = [...data.leaveRequests]
+    .filter((item) => item.employeeId === employeeId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
   const form = useForm<LeaveFormValues>({
     resolver: zodResolver(leaveFormSchema),
-    defaultValues: { type: "CASUAL", startDate: "", endDate: "", isHalfDay: false, reason: "", attachmentName: "" },
+    defaultValues: { type: "CASUAL", startDate: today, endDate: today, isHalfDay: false, reason: "" },
   });
+  const startDate = form.watch("startDate");
 
-  function onSubmit(values: LeaveFormValues) {
+  async function onSubmit(values: LeaveFormValues) {
+    setSaving(true);
     try {
-      leaveService.createLeaveRequest({
+      await leaveService.createLeaveRequest({
         employeeId,
         type: values.type,
         startDate: values.startDate,
-        endDate: values.endDate,
+        endDate: values.isHalfDay ? values.startDate : values.endDate,
         isHalfDay: values.isHalfDay,
         reason: values.reason,
-        attachmentName: values.attachmentName || null,
+        file,
       });
       toast.success("Leave request submitted.");
-      form.reset();
+      router.push("/dashboard");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not submit leave request.");
+    } finally {
+      setSaving(false);
     }
   }
 
   const columns: DataTableColumn<LeaveRequest>[] = [
-    { id: "date", header: "Date", accessor: (row) => row.startDate, cell: (row) => `${formatDate(row.startDate)} - ${formatDate(row.endDate)}` },
+    {
+      id: "date",
+      header: "Date",
+      accessor: (row) => row.startDate,
+      cell: (row) => (
+        <Link href={`/leave/${row.id}`} className="font-medium hover:text-primary">
+          {formatDate(row.startDate)} - {formatDate(row.endDate)}
+        </Link>
+      ),
+    },
     { id: "type", header: "Type", cell: (row) => leaveTypeLabel(row.type) },
     { id: "duration", header: "Duration", cell: (row) => (row.isHalfDay ? "Half day" : `${daysBetweenInclusive(row.startDate, row.endDate)} day(s)`) },
-    { id: "reason", header: "Reason", cell: (row) => row.reason },
+    {
+      id: "reason",
+      header: "Reason",
+      cell: (row) => (
+        <Link href={`/leave/${row.id}`} className="hover:text-primary">
+          {row.reason}
+        </Link>
+      ),
+    },
     { id: "status", header: "Status", cell: (row) => <LeaveStatusBadge status={row.status} /> },
+    {
+      id: "details",
+      header: "Details",
+      className: "w-[1%]",
+      cell: (row) => (
+        <Link href={`/leave/${row.id}`} className={buttonVariants({ variant: "outline", size: "icon-sm" })} aria-label="View leave details">
+          <Eye className="size-4" />
+        </Link>
+      ),
+    },
   ];
 
   return (
@@ -96,24 +135,32 @@ function EmployeeLeave({ employeeId }: { employeeId: string }) {
             </div>
             <div>
               <Label>Start date</Label>
-              <Input type="date" className="mt-1.5" {...form.register("startDate")} />
+              <Input type="date" min={today} className="mt-1.5" {...form.register("startDate")} />
               <FieldError message={form.formState.errors.startDate?.message} />
             </div>
             <div>
               <Label>End date</Label>
-              <Input type="date" className="mt-1.5" {...form.register("endDate")} />
+              <Input type="date" min={startDate || today} className="mt-1.5" {...form.register("endDate")} />
               <FieldError message={form.formState.errors.endDate?.message} />
             </div>
             <div className="flex h-10 items-center gap-2 md:mt-7">
               <input id="half" type="checkbox" {...form.register("isHalfDay")} />
               <Label htmlFor="half">Half day</Label>
             </div>
-            <div>
-              <Label>Attachment name</Label>
-              <Input className="mt-1.5" placeholder="optional-file.pdf" {...form.register("attachmentName")} />
+            <div className="md:col-span-2">
+              <Label>Attachment</Label>
+              <Input
+                className="mt-1.5"
+                type="file"
+                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp,application/pdf,image/*"
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              />
+              <p className="mt-1.5 text-xs text-muted-foreground">Optional PDF, Word, or image up to 10 MB.</p>
             </div>
             <div className="flex items-end">
-              <Button type="submit" className="w-full md:w-auto">Submit request</Button>
+              <Button type="submit" className="w-full md:w-auto" disabled={saving}>
+                {saving ? "Submitting…" : "Submit request"}
+              </Button>
             </div>
             <div className={formWideClass}>
               <Label>Reason</Label>
@@ -157,7 +204,15 @@ function ManagementLeave({ data, reviewerId }: { data: ReturnType<typeof useData
     ) },
     { id: "department", header: "Department", cell: (row) => getDepartmentName(data, data.employees.find((item) => item.id === row.employeeId)?.departmentId ?? "") },
     { id: "type", header: "Type", cell: (row) => leaveTypeLabel(row.type) },
-    { id: "dates", header: "Dates", cell: (row) => `${formatDate(row.startDate)} - ${formatDate(row.endDate)}` },
+    {
+      id: "dates",
+      header: "Dates",
+      cell: (row) => (
+        <Link href={`/leave/${row.id}`} className="hover:text-primary">
+          {formatDate(row.startDate)} - {formatDate(row.endDate)}
+        </Link>
+      ),
+    },
     { id: "reason", header: "Reason", cell: (row) => row.reason },
     { id: "status", header: "Status", cell: (row) => <LeaveStatusBadge status={row.status} /> },
     {
@@ -166,13 +221,18 @@ function ManagementLeave({ data, reviewerId }: { data: ReturnType<typeof useData
       cell: (row) =>
         row.status === "PENDING" ? (
           <div className="flex gap-2">
+            <Link href={`/leave/${row.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+              View
+            </Link>
             <Button size="sm" onClick={() => { leaveService.updateLeaveStatus(row.id, "APPROVED", reviewerId); toast.success("Leave approved."); }}>
               Approve
             </Button>
             <Button size="sm" variant="destructive" onClick={() => setRejectId(row.id)}>Reject</Button>
           </div>
         ) : (
-          <span className="text-xs text-muted-foreground">{row.rejectionReason ?? "—"}</span>
+          <Link href={`/leave/${row.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+            View
+          </Link>
         ),
     },
   ];
@@ -237,6 +297,89 @@ function ManagementLeave({ data, reviewerId }: { data: ReturnType<typeof useData
   );
 }
 
+export function LeaveDetailPage({ id }: { id: string }) {
+  const user = useAuthStore((state) => state.user);
+  const data = useDataStore();
+  const request = leaveService.getLeaveById(id);
+  const employee = user ? getEmployeeByUser(data, user.id) : undefined;
+
+  if (!user) return null;
+  if (!request) {
+    return <p className="text-sm text-muted-foreground">Leave request not found.</p>;
+  }
+  if (user.role !== "MANAGEMENT" && request.employeeId !== employee?.id) {
+    return <p className="text-sm text-muted-foreground">You can only view your own leave requests.</p>;
+  }
+
+  const owner = data.employees.find((item) => item.id === request.employeeId);
+  const reviewer = request.reviewedBy ? data.users.find((item) => item.id === request.reviewedBy) : null;
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Leave details"
+        description={`${leaveTypeLabel(request.type)} · ${formatDate(request.startDate)} - ${formatDate(request.endDate)}`}
+        actions={
+          <Link href="/leave" className={buttonVariants({ variant: "outline" })}>
+            Back to leaves
+          </Link>
+        }
+      />
+      <Card>
+        <CardContent className="grid gap-4 p-5 sm:grid-cols-2">
+          {user.role === "MANAGEMENT" ? (
+            <Detail label="Employee" value={owner?.fullName ?? getEmployeeName(data, request.employeeId)} />
+          ) : null}
+          <Detail label="Type" value={leaveTypeLabel(request.type)} />
+          <Detail label="Dates" value={`${formatDate(request.startDate)} - ${formatDate(request.endDate)}`} />
+          <Detail label="Duration" value={request.isHalfDay ? "Half day" : `${daysBetweenInclusive(request.startDate, request.endDate)} day(s)`} />
+          <div>
+            <p className="text-sm text-muted-foreground">Status</p>
+            <div className="mt-1"><LeaveStatusBadge status={request.status} /></div>
+          </div>
+          <Detail label="Submitted" value={formatDateTime(request.createdAt)} />
+          {reviewer ? <Detail label="Reviewed by" value={reviewer.name} /> : null}
+          {request.reviewedAt ? <Detail label="Reviewed on" value={formatDateTime(request.reviewedAt)} /> : null}
+          <div className="sm:col-span-2">
+            <p className="text-sm text-muted-foreground">Reason</p>
+            <p className="mt-1 text-sm">{request.reason}</p>
+          </div>
+          {request.status === "REJECTED" ? (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 sm:col-span-2">
+              <p className="text-sm font-medium text-destructive">Rejection reason</p>
+              <p className="mt-1 text-sm">{request.rejectionReason || "No reason was provided."}</p>
+            </div>
+          ) : null}
+          <div className="sm:col-span-2">
+            <p className="text-sm text-muted-foreground">Attachment</p>
+            {request.hasAttachment ? (
+              <a
+                href={leaveService.leaveAttachmentHref(request.id)}
+                target="_blank"
+                rel="noreferrer"
+                className={`${buttonVariants({ variant: "outline", size: "sm" })} mt-2`}
+              >
+                View {request.attachmentName || "document"}
+              </a>
+            ) : (
+              <p className="mt-1 text-sm">No attachment uploaded.</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-medium">{value}</p>
+    </div>
+  );
+}
+
 function Balance({ title, value, entitlement }: { title: string; value: number; entitlement: number }) {
   return (
     <Card>
@@ -253,4 +396,3 @@ function FieldError({ message }: { message?: string }) {
   if (!message) return null;
   return <p className="mt-1 text-xs text-destructive">{message}</p>;
 }
-

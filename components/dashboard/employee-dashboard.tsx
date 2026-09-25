@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { CalendarDays, FileText, Palmtree } from "lucide-react";
 import { AttendanceControlCard } from "@/components/attendance/attendance-control-card";
 import { PageHeader } from "@/components/shared/page-header";
@@ -7,18 +8,24 @@ import { LeaveStatusBadge } from "@/components/shared/status-badge";
 import { LinkButton } from "@/components/shared/link-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDepartmentName, getDesignationName } from "@/lib/lookups";
+import { isAnnouncementVisibleTo } from "@/lib/services/announcementService";
 import { leaveTypeLabel, formatDate } from "@/lib/utils/format";
 import { useDataStore } from "@/lib/stores/data-store";
 import type { Employee } from "@/types";
 
 export function EmployeeDashboard({ employee }: { employee: Employee }) {
   const data = useDataStore();
-  const leaves = data.leaveRequests.filter((item) => item.employeeId === employee.id).slice(0, 4);
+  const leaves = [...data.leaveRequests]
+    .filter((item) => item.employeeId === employee.id)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 4);
   const holidays = [...data.holidays]
     .filter((item) => item.date >= "2026-09-22")
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 3);
-  const announcements = data.announcements.filter((item) => item.status === "PUBLISHED").slice(0, 3);
+  const announcements = data.announcements
+    .filter((item) => isAnnouncementVisibleTo(item, { role: "EMPLOYEE" }, employee))
+    .slice(0, 3);
   const balance = data.leaveBalances.find((item) => item.employeeId === employee.id);
 
   return (
@@ -65,17 +72,26 @@ export function EmployeeDashboard({ employee }: { employee: Employee }) {
         </Card>
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <FileText className="size-4" /> Announcements
+            <CardTitle className="flex items-center justify-between gap-2 text-base">
+              <span className="flex items-center gap-2">
+                <FileText className="size-4" /> Announcements
+              </span>
+              <Link href="/announcements" className="text-xs font-normal text-primary hover:underline">
+                View all
+              </Link>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {announcements.map((item) => (
-              <div key={item.id}>
-                <p className="text-sm font-medium">{item.title}</p>
-                <p className="text-xs text-muted-foreground">{item.description}</p>
-              </div>
-            ))}
+            {announcements.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No announcements yet.</p>
+            ) : (
+              announcements.map((item) => (
+                <Link key={item.id} href="/announcements" className="block rounded-lg hover:bg-muted/50">
+                  <p className="text-sm font-medium">{item.title}</p>
+                  <p className="text-xs text-muted-foreground">{item.description}</p>
+                </Link>
+              ))
+            )}
           </CardContent>
         </Card>
       </div>
@@ -88,7 +104,7 @@ export function EmployeeDashboard({ employee }: { employee: Employee }) {
             <p className="text-sm text-muted-foreground">No leave requests yet.</p>
           ) : (
             leaves.map((item) => (
-              <div key={item.id} className="flex items-center justify-between gap-3">
+              <Link key={item.id} href={`/leave/${item.id}`} className="flex items-center justify-between gap-3 rounded-lg hover:bg-muted/50">
                 <div>
                   <p className="text-sm font-medium">{leaveTypeLabel(item.type)}</p>
                   <p className="text-xs text-muted-foreground">
@@ -96,7 +112,7 @@ export function EmployeeDashboard({ employee }: { employee: Employee }) {
                   </p>
                 </div>
                 <LeaveStatusBadge status={item.status} />
-              </div>
+              </Link>
             ))
           )}
         </CardContent>

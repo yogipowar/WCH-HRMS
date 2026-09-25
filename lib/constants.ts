@@ -57,6 +57,7 @@ export const EMPLOYEE_NAV: AppNavItem[] = [
   { title: "My Attendance", href: "/attendance", icon: "Clock3" },
   { title: "My Leaves", href: "/leave", icon: "CalendarDays" },
   { title: "Holidays", href: "/holidays", icon: "Palmtree" },
+  { title: "Announcements", href: "/announcements", icon: "Megaphone" },
   { title: "Documents", href: "/documents", icon: "FileText" },
   { title: "Salary slips", href: "/payroll", icon: "Wallet" },
   { title: "Notifications", href: "/notifications", icon: "Bell" },
@@ -75,7 +76,6 @@ export const MANAGEMENT_ONLY_PREFIXES = [
   "/departments",
   "/designations",
   "/reports",
-  "/announcements",
   "/settings",
 ] as const;
 

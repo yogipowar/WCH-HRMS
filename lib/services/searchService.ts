@@ -65,7 +65,7 @@ export function searchApp(query: string, role: UserRole, userId: string): Search
           type: "leave",
           title: `${name} · ${item.type}`,
           subtitle: item.reason,
-          href: "/leave",
+          href: `/leave/${item.id}`,
         });
       }
     });
@@ -91,7 +91,7 @@ export function searchApp(query: string, role: UserRole, userId: string): Search
             type: "leave",
             title: `${item.type} leave`,
             subtitle: item.reason,
-            href: "/leave",
+            href: `/leave/${item.id}`,
           });
         }
       });
@@ -131,7 +131,7 @@ export function searchApp(query: string, role: UserRole, userId: string): Search
           type: "announcement",
           title: item.title,
           subtitle: item.status,
-          href: role === "MANAGEMENT" ? "/announcements" : "/dashboard",
+          href: "/announcements",
         });
       }
     });

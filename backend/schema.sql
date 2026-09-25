@@ -90,6 +90,8 @@ CREATE TABLE IF NOT EXISTS leave_requests (
   is_half_day TINYINT(1) NOT NULL DEFAULT 0,
   reason TEXT NOT NULL,
   attachment_name VARCHAR(255) NULL,
+  attachment_mime VARCHAR(128) NULL,
+  attachment_data LONGBLOB NULL,
   status VARCHAR(32) NOT NULL,
   rejection_reason TEXT NULL,
   reviewed_by VARCHAR(64) NULL,

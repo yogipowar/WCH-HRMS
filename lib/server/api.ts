@@ -3,7 +3,7 @@ import type { RowDataPacket } from "mysql2";
 import { settings as defaultSettings } from "@/data/mock-data";
 import type { AppData } from "@/data/mock-data";
 import { createId } from "@/lib/lookups";
-import { ensureDocumentFileColumns, execute, query } from "@/lib/server/db";
+import { ensureDocumentFileColumns, ensureLeaveAttachmentColumns, execute, query } from "@/lib/server/db";
 import { clearTokenCookie, signToken, tokenCookie, tokenFromRequest, verifyToken } from "@/lib/server/auth";
 import type {
   Announcement,
@@ -17,11 +17,13 @@ import type {
   Holiday,
   LeaveBalance,
   LeaveRequest,
+  LeaveType,
   Notification,
   PayrollRecord,
   User,
 } from "@/types";
-import { DOCUMENT_TYPES } from "@/types";
+import { DOCUMENT_TYPES, LEAVE_TYPES } from "@/types";
+import { todayIsoDate } from "@/lib/utils/format";
 
 type Json = Record<string, unknown>;
 
@@ -136,6 +138,7 @@ function mapLeave(row: RowDataPacket): LeaveRequest {
     isHalfDay: bool(row.is_half_day),
     reason: row.reason,
     attachmentName: row.attachment_name,
+    hasAttachment: bool(row.has_attachment),
     status: row.status,
     rejectionReason: row.rejection_reason,
     reviewedBy: row.reviewed_by,
@@ -213,6 +216,7 @@ function mapPayroll(row: RowDataPacket): PayrollRecord {
 
 export async function loadBootstrap(): Promise<AppData> {
   await ensureDocumentFileColumns();
+  await ensureLeaveAttachmentColumns();
   const [
     users,
     employees,
@@ -234,7 +238,12 @@ export async function loadBootstrap(): Promise<AppData> {
     query("SELECT * FROM designations"),
     query("SELECT * FROM attendance_records"),
     query("SELECT * FROM leave_balances"),
-    query("SELECT * FROM leave_requests"),
+    query(
+      `SELECT id, employee_id, type, start_date, end_date, is_half_day, reason, attachment_name,
+              status, rejection_reason, reviewed_by, reviewed_at, created_at,
+              (attachment_data IS NOT NULL AND OCTET_LENGTH(attachment_data) > 0) AS has_attachment
+       FROM leave_requests`,
+    ),
     query("SELECT * FROM holidays"),
     query("SELECT * FROM notifications"),
     query("SELECT * FROM announcements"),
@@ -514,6 +523,146 @@ async function createUploadedDocument(request: Request) {
   return jsonResponse(200, item);
 }
 
+async function createLeaveFromRequest(request: Request, user: User) {
+  await ensureLeaveAttachmentColumns();
+  const contentType = request.headers.get("content-type") ?? "";
+  let employeeId = "";
+  let type = "";
+  let startDate = "";
+  let endDate = "";
+  let isHalfDay = false;
+  let reason = "";
+  let file: File | null = null;
+
+  if (contentType.includes("multipart/form-data")) {
+    const form = await request.formData();
+    employeeId = String(form.get("employeeId") || "").trim();
+    type = String(form.get("type") || "").trim();
+    startDate = String(form.get("startDate") || "").trim();
+    endDate = String(form.get("endDate") || "").trim();
+    isHalfDay = ["true", "1", "on"].includes(String(form.get("isHalfDay") || "").toLowerCase());
+    reason = String(form.get("reason") || "").trim();
+    const uploaded = form.get("file");
+    file = uploaded instanceof File && uploaded.size > 0 ? uploaded : null;
+  } else {
+    const item = (await request.json().catch(() => ({}))) as Partial<LeaveRequest>;
+    employeeId = String(item.employeeId || "").trim();
+    type = String(item.type || "").trim();
+    startDate = String(item.startDate || "").trim();
+    endDate = String(item.endDate || "").trim();
+    isHalfDay = Boolean(item.isHalfDay);
+    reason = String(item.reason || "").trim();
+  }
+
+  const linked = await linkedEmployeeId(user);
+  if (user.role !== "MANAGEMENT") {
+    if (!linked) {
+      return jsonResponse(400, { error: "No employee profile found." });
+    }
+    employeeId = linked;
+  }
+  if (!employeeId) {
+    return jsonResponse(400, { error: "Employee is required." });
+  }
+
+  if (!(LEAVE_TYPES as readonly string[]).includes(type) || type === "UNPAID") {
+    return jsonResponse(400, { error: "Choose a valid leave type." });
+  }
+  const today = todayIsoDate();
+  if (!startDate || !endDate) {
+    return jsonResponse(400, { error: "Leave dates are required." });
+  }
+  if (startDate < today) {
+    return jsonResponse(400, { error: "Leave date cannot be earlier than today." });
+  }
+  if (endDate < startDate) {
+    return jsonResponse(400, { error: "End date cannot be before the start date." });
+  }
+  if (reason.length < 8) {
+    return jsonResponse(400, { error: "Please provide a short reason." });
+  }
+  if (file) {
+    if (file.size > DOCUMENT_MAX_BYTES) {
+      return jsonResponse(400, { error: "Attachment must be 10 MB or smaller." });
+    }
+    if (file.type && !DOCUMENT_ALLOWED_TYPES.has(file.type)) {
+      return jsonResponse(400, { error: "Upload a PDF, Word document, or image." });
+    }
+  }
+
+  const item: LeaveRequest = {
+    id: createId("leave"),
+    employeeId,
+    type: type as LeaveType,
+    startDate,
+    endDate: isHalfDay ? startDate : endDate,
+    isHalfDay,
+    reason,
+    attachmentName: file?.name ?? null,
+    hasAttachment: Boolean(file),
+    status: "PENDING",
+    rejectionReason: null,
+    reviewedBy: null,
+    reviewedAt: null,
+    createdAt: new Date().toISOString(),
+  };
+
+  await execute(
+    `INSERT INTO leave_requests (
+      id, employee_id, type, start_date, end_date, is_half_day, reason, attachment_name,
+      attachment_mime, attachment_data, status, rejection_reason, reviewed_by, reviewed_at, created_at
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [
+      item.id,
+      item.employeeId,
+      item.type,
+      item.startDate,
+      item.endDate,
+      item.isHalfDay ? 1 : 0,
+      item.reason,
+      item.attachmentName,
+      file ? file.type || "application/octet-stream" : null,
+      file ? Buffer.from(await file.arrayBuffer()) : null,
+      item.status,
+      item.rejectionReason,
+      item.reviewedBy,
+      item.reviewedAt,
+      item.createdAt,
+    ],
+  );
+
+  return jsonResponse(200, item);
+}
+
+async function serveLeaveAttachment(user: User, leaveId: string) {
+  await ensureLeaveAttachmentColumns();
+  const rows = await query(
+    "SELECT employee_id, attachment_name, attachment_mime, attachment_data FROM leave_requests WHERE id = ?",
+    [leaveId],
+  );
+  const row = rows[0];
+  if (!row || !row.attachment_data) {
+    return jsonResponse(404, { error: "Leave attachment not found." });
+  }
+
+  if (user.role !== "MANAGEMENT") {
+    const employeeId = await linkedEmployeeId(user);
+    if (!employeeId || row.employee_id !== employeeId) {
+      return jsonResponse(403, { error: "You can only view your own leave attachments." });
+    }
+  }
+
+  const bytes = Buffer.isBuffer(row.attachment_data) ? row.attachment_data : Buffer.from(row.attachment_data);
+  return new Response(bytes, {
+    status: 200,
+    headers: {
+      "Content-Type": String(row.attachment_mime || "application/octet-stream"),
+      "Content-Disposition": `inline; filename="${safeDownloadName(String(row.attachment_name || "attachment"))}"`,
+      "Cache-Control": "private, no-store",
+    },
+  });
+}
+
 async function serveDocumentFile(user: User, documentId: string) {
   await ensureDocumentFileColumns();
   const rows = await query(
@@ -695,30 +844,12 @@ export async function handleApiRequest(request: Request, parts: string[]) {
       return jsonResponse(200, { ok: true });
     }
 
+    if (parts[0] === "leave" && parts[1] && parts[2] === "attachment" && request.method === "GET") {
+      return serveLeaveAttachment(user, parts[1]);
+    }
+
     if (parts[0] === "leave" && request.method === "POST") {
-      const item = (await request.json()) as LeaveRequest;
-      await execute(
-        `INSERT INTO leave_requests (
-          id, employee_id, type, start_date, end_date, is_half_day, reason, attachment_name,
-          status, rejection_reason, reviewed_by, reviewed_at, created_at
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [
-          item.id,
-          item.employeeId,
-          item.type,
-          item.startDate,
-          item.endDate,
-          item.isHalfDay ? 1 : 0,
-          item.reason,
-          item.attachmentName,
-          item.status,
-          item.rejectionReason,
-          item.reviewedBy,
-          item.reviewedAt,
-          item.createdAt,
-        ],
-      );
-      return jsonResponse(200, item);
+      return createLeaveFromRequest(request, user);
     }
 
     if (parts[0] === "leave" && parts[1] && parts[2] === "status" && request.method === "PATCH") {

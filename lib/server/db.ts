@@ -37,6 +37,7 @@ export async function getPool(): Promise<Pool> {
     const schema = fs.readFileSync(path.join(process.cwd(), "backend/schema.sql"), "utf8");
     await pool.query(schema);
     await ensureDocumentFileColumns(pool);
+    await ensureLeaveAttachmentColumns(pool);
     schemaReady = true;
   }
   return pool;
@@ -59,6 +60,25 @@ export async function ensureDocumentFileColumns(db?: Pool) {
     await pool.query("ALTER TABLE documents ADD COLUMN file_data LONGBLOB NULL");
   }
   documentColumnsReady = true;
+}
+
+let leaveColumnsReady = false;
+
+export async function ensureLeaveAttachmentColumns(db?: Pool) {
+  if (leaveColumnsReady) return;
+  const pool = db ?? (await getPool());
+  const [columns] = await pool.query<RowDataPacket[]>(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'leave_requests'`,
+  );
+  const names = new Set(columns.map((row) => String(row.COLUMN_NAME)));
+  if (!names.has("attachment_mime")) {
+    await pool.query("ALTER TABLE leave_requests ADD COLUMN attachment_mime VARCHAR(128) NULL");
+  }
+  if (!names.has("attachment_data")) {
+    await pool.query("ALTER TABLE leave_requests ADD COLUMN attachment_data LONGBLOB NULL");
+  }
+  leaveColumnsReady = true;
 }
 
 export async function query<T extends RowDataPacket>(sql: string, params: unknown[] = []) {

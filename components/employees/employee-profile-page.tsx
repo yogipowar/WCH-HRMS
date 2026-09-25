@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { EmployeeForm } from "@/components/employees/employee-form";
 import { AttendanceHistoryList } from "@/components/attendance/attendance-history-list";
@@ -155,10 +156,10 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
             <InfoCard title="Paid remaining" value={`${balance ? remainingPaidDays(balance) : 0} / ${YEARLY_PAID_LEAVE_TOTAL} days`} />
           </div>
           {leaves.map((item) => (
-            <div key={item.id} className="flex items-center justify-between rounded-lg border p-3 text-sm">
+            <Link key={item.id} href={`/leave/${item.id}`} className="flex items-center justify-between rounded-lg border p-3 text-sm hover:bg-muted/50">
               <span>{leaveTypeLabel(item.type)} · {formatDate(item.startDate)}</span>
               <LeaveStatusBadge status={item.status} />
-            </div>
+            </Link>
           ))}
         </TabsContent>
         <TabsContent value="documents" className="space-y-3">

@@ -242,6 +242,7 @@ export interface LeaveRequest {
   isHalfDay: boolean;
   reason: string;
   attachmentName: string | null;
+  hasAttachment: boolean;
   status: LeaveStatus;
   rejectionReason: string | null;
   reviewedBy: string | null;
