@@ -50,6 +50,20 @@ function bool(value: unknown) {
   return Boolean(Number(value) || value);
 }
 
+function publicDbError(error: unknown) {
+  const message = error instanceof Error ? error.message : "Server error";
+  const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
+  if (
+    code === "ENOTFOUND" ||
+    code === "EAI_AGAIN" ||
+    message.includes("ENOTFOUND") ||
+    message.includes("EAI_AGAIN")
+  ) {
+    return "Could not reach the database. Please try again.";
+  }
+  return message;
+}
+
 function dateOnly(value: unknown, fallback = ""): string {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     const year = value.getFullYear();
@@ -951,6 +965,6 @@ export async function handleApiRequest(request: Request, parts: string[]) {
     return jsonResponse(404, { error: "Not found" });
   } catch (error) {
     console.error(error);
-    return jsonResponse(500, { error: error instanceof Error ? error.message : "Server error" });
+    return jsonResponse(500, { error: publicDbError(error) });
   }
 }

@@ -100,7 +100,7 @@ export function EmployeeForm({ employee }: { employee?: Employee }) {
     defaultValues: toDefaults(employee, account?.username ?? ""),
   });
 
-  function onSubmit(values: EmployeeFormValues) {
+  async function onSubmit(values: EmployeeFormValues) {
     if (isUsernameTaken(values.username, employee?.userId)) {
       form.setError("username", { message: "This username is already taken" });
       return;
@@ -165,7 +165,7 @@ export function EmployeeForm({ employee }: { employee?: Employee }) {
         return;
       }
 
-      const created = employeeService.createEmployee(payload, {
+      const created = await employeeService.createEmployee(payload, {
         username: values.username,
         password: values.password,
       });

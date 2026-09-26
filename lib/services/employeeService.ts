@@ -21,7 +21,7 @@ export const employeeService = {
   getEmployeeByCode(code: string) {
     return getData().employees.find((item) => item.employeeCode === code) ?? null;
   },
-  createEmployee(input: Omit<Employee, "id">, login: { username: string; password: string }) {
+  async createEmployee(input: Omit<Employee, "id">, login: { username: string; password: string }) {
     if (isUsernameTaken(login.username)) {
       throw new Error("This username is already taken.");
     }
@@ -47,7 +47,17 @@ export const employeeService = {
       leaveBalances: [...data.leaveBalances, leaveBalance],
       payrollRecords: [...data.payrollRecords, payrollRecord],
     }));
-    void api.createEmployee({ employee: savedEmployee, user, leaveBalance, payrollRecord });
+    try {
+      await api.createEmployee({ employee: savedEmployee, user, leaveBalance, payrollRecord });
+    } catch (error) {
+      updateData((data) => ({
+        employees: data.employees.filter((item) => item.id !== savedEmployee.id),
+        users: data.users.filter((item) => item.id !== user.id),
+        leaveBalances: data.leaveBalances.filter((item) => item.employeeId !== savedEmployee.id),
+        payrollRecords: data.payrollRecords.filter((item) => item.id !== payrollRecord.id),
+      }));
+      throw error;
+    }
     return savedEmployee;
   },
   updateEmployee(id: string, patch: Partial<Employee>, login?: EmployeeLogin) {
@@ -89,7 +99,7 @@ export const employeeService = {
         (item) => item.employeeId === id && item.period === CURRENT_PAYROLL_PERIOD,
       );
       if (user) {
-        void api.updateEmployee(id, { employee, user, payrollRecord });
+        void api.updateEmployee(id, { employee, user, payrollRecord }).catch(() => undefined);
       }
       return { employees, users, payrollRecords };
     });
