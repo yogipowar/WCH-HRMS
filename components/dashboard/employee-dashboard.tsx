@@ -128,7 +128,7 @@ export function EmployeeDashboard({ employee }: { employee: Employee }) {
                 ticks={Array.from({ length: employee.dailyRequiredHours + 1 }, (_, hour) => hour).filter((hour) => hour % 3 === 0 || hour === employee.dailyRequiredHours)}
                 width={28}
               />
-              <Tooltip formatter={(value: number) => [`${value}h`, "Worked"]} />
+              <Tooltip formatter={(value) => [`${Number(value ?? 0)}h`, "Worked"]} />
               <Bar dataKey="hours" name="Worked hours" fill="var(--primary)" maxBarSize={42} radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
