@@ -124,6 +124,17 @@ export function liveStatusLabel(status: LiveAttendanceStatus): string {
   }
 }
 
+export function payrollStatusLabel(status: "DRAFT" | "PROCESSED" | "PAID"): string {
+  switch (status) {
+    case "DRAFT":
+      return "Draft";
+    case "PROCESSED":
+      return "Proceed";
+    case "PAID":
+      return "Paid";
+  }
+}
+
 export function announcementStatusLabel(status: AnnouncementStatus): string {
   switch (status) {
     case "DRAFT":

@@ -5,6 +5,7 @@ import { Download, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getDepartmentName, getDesignationName } from "@/lib/lookups";
+import { isPayslipReleased } from "@/lib/payroll/record";
 import { payslipHtml, payslipTitle, printPayslip, type PayslipContent } from "@/lib/payroll/payslip-html";
 import type { AppData } from "@/data/mock-data";
 import type { Employee, PayrollRecord } from "@/types";
@@ -28,15 +29,17 @@ export function PayslipActions({
   data,
   record,
   employee,
+  allowPreview = true,
 }: {
   data: AppData;
   record: PayrollRecord;
   employee?: Employee;
+  allowPreview?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const content = payslipContentFor(data, record, employee);
-  if (!content || !record.payslipAvailable) {
-    return <span className="text-sm text-muted-foreground">Unavailable</span>;
+  if (!content || !record.payslipAvailable || (!allowPreview && !isPayslipReleased(record))) {
+    return <span className="text-sm text-muted-foreground">{allowPreview ? "Unavailable" : "Pending proceed"}</span>;
   }
 
   return (

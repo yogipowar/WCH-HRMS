@@ -15,21 +15,21 @@ export function AppSidebar({ role }: { role: UserRole }) {
   return (
     <aside
       className={cn(
-        "sticky top-0 hidden h-svh shrink-0 border-r bg-sidebar transition-[width] duration-200 lg:flex lg:flex-col",
-        collapsed ? "w-[72px]" : "w-72",
+        "sticky top-0 hidden h-svh shrink-0 border-r border-sidebar-border bg-sidebar transition-[width] duration-200 lg:flex lg:flex-col",
+        collapsed ? "w-[72px]" : "w-60",
       )}
     >
-      <div className={cn("flex h-16 items-center border-b", collapsed ? "justify-center px-2" : "gap-2 px-3")}>
+      <div className={cn("flex h-14 items-center", collapsed ? "justify-center px-2" : "gap-2 px-4")}>
         <BrandLogo
           priority
           compact={collapsed}
-          className={collapsed ? "size-9" : "max-h-10 max-w-[188px]"}
+          className={collapsed ? "size-8" : "max-h-8 max-w-[168px]"}
         />
         {collapsed ? null : (
           <Button
             variant="ghost"
             size="icon-sm"
-            className="ml-auto shrink-0"
+            className="ml-auto shrink-0 text-muted-foreground"
             onClick={toggle}
             aria-label="Collapse sidebar"
           >
@@ -37,7 +37,7 @@ export function AppSidebar({ role }: { role: UserRole }) {
           </Button>
         )}
       </div>
-      <div className={cn("flex-1 overflow-y-auto py-4", collapsed ? "px-2" : "px-3")}>
+      <div className={cn("flex-1 overflow-y-auto py-3", collapsed ? "px-2" : "px-3")}>
         <SidebarNav role={role} collapsed={collapsed} />
       </div>
       {collapsed ? (

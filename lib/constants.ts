@@ -26,7 +26,7 @@ export const STORAGE_KEYS = {
   data: "wch-hrms.data",
   settings: "wch-hrms.settings",
   sidebar: "wch-hrms.sidebar",
-  colorTheme: "wch-hrms.color-theme",
+  colorTheme: "wch-hrms.color-theme.v2",
 } as const;
 
 export interface AppNavItem {

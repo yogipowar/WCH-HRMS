@@ -27,13 +27,15 @@ import { useDataStore } from "@/lib/stores/data-store";
 import { announcementFormSchema, type AnnouncementFormValues } from "@/lib/validations/announcement";
 import { saturdayWeekLabel, workWeekPolicyLabel } from "@/lib/attendance/work-calendar";
 import { YEARLY_PAID_LEAVE_LABEL } from "@/lib/leave/policy";
-import { currency, documentTypeLabel, formatDate, formatDateTime, formatPeriod, todayIsoDate } from "@/lib/utils/format";
+import { currency, documentTypeLabel, formatDate, formatDateTime, formatPeriod, payrollStatusLabel, todayIsoDate } from "@/lib/utils/format";
 import type { Announcement, EmployeeDocument, PayrollRecord, SaturdayWeek, Weekday } from "@/types";
 import { CORE_WORK_DAYS, DEFAULT_SATURDAY_OFF_WEEKS, SATURDAY_WEEKS } from "@/types";
 import { NativeSelect } from "@/components/ui/native-select";
 import { formDialogClass, formFieldControlClass, formGridClass, formWideClass } from "@/lib/ui/form-styles";
 import { AppearanceThemePanel } from "@/components/layout/theme-picker";
 import { PayslipActions } from "@/components/payroll/payslip-actions";
+import { PayrollStatusControl } from "@/components/payroll/payroll-status-control";
+import { isPayslipReleased } from "@/lib/payroll/record";
 
 export function PayrollPage() {
   const user = useAuthStore((state) => state.user);
@@ -45,7 +47,9 @@ export function PayrollPage() {
   const [status, setStatus] = useState("all");
 
   const allRecords = data.payrollRecords;
-  const source = (isAdmin ? allRecords : allRecords.filter((item) => item.employeeId === employee?.id))
+  const source = (isAdmin
+    ? allRecords
+    : allRecords.filter((item) => item.employeeId === employee?.id && isPayslipReleased(item)))
     .slice()
     .sort((a, b) => b.period.localeCompare(a.period) || a.employeeId.localeCompare(b.employeeId));
   const periods = useMemo(
@@ -84,12 +88,23 @@ export function PayrollPage() {
     { id: "allowances", header: "Allowances", cell: (row) => currency(row.allowances) },
     { id: "deductions", header: "Deductions", cell: (row) => currency(row.deductions) },
     { id: "net", header: "Net", cell: (row) => currency(row.netSalary) },
-    { id: "status", header: "Status", cell: (row) => row.status },
+    {
+      id: "status",
+      header: "Status",
+      cell: (row) => (isAdmin ? <PayrollStatusControl record={row} /> : payrollStatusLabel(row.status)),
+    },
     {
       id: "actions",
       header: "Salary slip",
       className: "w-[1%]",
-      cell: (row) => <PayslipActions data={data} record={row} employee={isAdmin ? undefined : employee} />,
+      cell: (row) => (
+        <PayslipActions
+          data={data}
+          record={row}
+          employee={isAdmin ? undefined : employee}
+          allowPreview={isAdmin}
+        />
+      ),
     },
   ];
 
@@ -99,8 +114,8 @@ export function PayrollPage() {
         title={isAdmin ? "Payroll" : "Salary slips"}
         description={
           isAdmin
-            ? "Review the current run and previous monthly payrolls. Open or download a salary slip for any period."
-            : "View and download this month’s salary slip, or choose a previous period."
+            ? "Change a row to Proceed to release that salary slip to the employee. Draft slips stay hidden."
+            : "View and download salary slips after administration marks them as Proceed."
         }
       />
       <div className="flex flex-wrap gap-3">
@@ -136,10 +151,22 @@ export function PayrollPage() {
           onChange={(event) => setStatus(event.target.value)}
         >
           <option value="all">All statuses</option>
-          <option value="PROCESSED">Processed</option>
-          <option value="PAID">Paid</option>
           <option value="DRAFT">Draft</option>
+          <option value="PROCESSED">Proceed</option>
+          <option value="PAID">Paid</option>
         </select>
+        {isAdmin && records.some((item) => item.status === "DRAFT") ? (
+          <Button
+            onClick={() => {
+              records
+                .filter((item) => item.status === "DRAFT")
+                .forEach((item) => payrollService.updateStatus(item.id, "PROCESSED"));
+              toast.success("Selected draft salary slips were released to employees.");
+            }}
+          >
+            Proceed visible drafts
+          </Button>
+        ) : null}
       </div>
       <DataTable data={records} columns={columns} rowKey={(row) => row.id} searchPlaceholder="Search payroll..." />
     </div>

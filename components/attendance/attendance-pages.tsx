@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
-import { AttendanceControlCard } from "@/components/attendance/attendance-control-card";
 import { AttendanceHistoryList } from "@/components/attendance/attendance-history-list";
+import { EmployeeAttendanceBoard } from "@/components/attendance/employee-attendance-board";
 import { AttendanceTimeline } from "@/components/attendance/attendance-timeline";
 import { LiveAttendanceTable } from "@/components/attendance/live-attendance-table";
 import { DatePicker } from "@/components/shared/date-range-picker";
@@ -34,15 +34,15 @@ export function AttendanceHomePage() {
     const employee = getEmployeeByUser(data, user.id);
     if (!employee) return <p className="text-sm text-muted-foreground">No employee profile found.</p>;
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <PageHeader
           title="My attendance"
           description="Track clock-in, breaks, and the 9-hour active work target."
           actions={<LinkButton href="/attendance/history" variant="outline">History</LinkButton>}
         />
-        <AttendanceControlCard employeeId={employee.id} />
-        <AttendanceHistoryList
-          records={[...data.attendanceRecords]
+        <EmployeeAttendanceBoard
+          employeeId={employee.id}
+          recentRecords={[...data.attendanceRecords]
             .filter((item) => item.employeeId === employee.id)
             .sort((a, b) => b.date.localeCompare(a.date))
             .slice(0, 7)}

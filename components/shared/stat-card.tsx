@@ -20,7 +20,7 @@ const toneClass: Record<NonNullable<StatCardProps["tone"]>, string> = {
 
 export function StatCard({ label, value, hint, icon: Icon, tone = "default" }: StatCardProps) {
   return (
-    <Card className="shadow-sm">
+    <Card>
       <CardContent className="flex items-start justify-between gap-3 p-4">
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground">{label}</p>

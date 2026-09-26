@@ -19,6 +19,7 @@ import { getDepartmentName, getDesignationName, getReportingPersonName, toLiveSt
 import { remainingPaidDays, YEARLY_PAID_LEAVE_TOTAL, YEARLY_PAID_LEAVES } from "@/lib/leave/policy";
 import { documentService } from "@/lib/services/documentService";
 import { PayslipActions } from "@/components/payroll/payslip-actions";
+import { PayrollStatusControl } from "@/components/payroll/payroll-status-control";
 import { payrollService } from "@/lib/services/payrollService";
 import { useDataStore } from "@/lib/stores/data-store";
 import { currency, documentTypeLabel, employmentTypeLabel, formatDate, formatPeriod, formatTime, initials, leaveTypeLabel, todayIsoDate } from "@/lib/utils/format";
@@ -196,7 +197,13 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
                 <Info label="Gross" value={currency(item.grossSalary)} />
                 <Info label="Deductions" value={currency(item.deductions)} />
                 <Info label="Net" value={currency(item.netSalary)} />
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Status</p>
+                    <div className="mt-1.5">
+                      <PayrollStatusControl record={item} />
+                    </div>
+                  </div>
                   <PayslipActions data={data} record={item} employee={employee} />
                 </div>
               </CardContent>

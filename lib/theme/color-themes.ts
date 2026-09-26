@@ -8,7 +8,7 @@ export const COLOR_THEMES = [
   {
     id: "atlantic",
     label: "Atlantic",
-    description: "Clear corporate blue used across classic HR platforms.",
+    description: "Clean white workspace with bright corporate blue.",
     swatch: "#2563eb",
   },
   {
@@ -38,7 +38,7 @@ export const COLOR_THEMES = [
 ] as const;
 
 export type ColorThemeId = (typeof COLOR_THEMES)[number]["id"];
-export const DEFAULT_COLOR_THEME: ColorThemeId = "navy";
+export const DEFAULT_COLOR_THEME: ColorThemeId = "atlantic";
 
 const LEGACY_THEME_MAP: Record<string, ColorThemeId> = {
   sky: "atlantic",

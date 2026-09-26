@@ -56,7 +56,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <AppSidebar role={user.role} />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader user={user} onLogout={logout} />
-        <main className={`flex-1 overflow-x-hidden px-4 py-6 sm:px-6 ${isEmployee ? "pb-24 lg:pb-6" : ""}`}>
+        <main className={`flex-1 overflow-x-hidden px-4 py-5 sm:px-6 lg:px-7 ${isEmployee ? "pb-24 lg:pb-6" : ""}`}>
           {children}
         </main>
       </div>

@@ -17,10 +17,14 @@ export function payrollAmounts(employee: Pick<Employee, "basicSalary" | "allowan
   };
 }
 
+export function isPayslipReleased(record: Pick<PayrollRecord, "status" | "payslipAvailable">) {
+  return record.payslipAvailable && (record.status === "PROCESSED" || record.status === "PAID");
+}
+
 export function buildPayrollRecord(
   employee: Employee,
   period = CURRENT_PAYROLL_PERIOD,
-  status: PayrollRecord["status"] = period === CURRENT_PAYROLL_PERIOD ? "PROCESSED" : "PAID",
+  status: PayrollRecord["status"] = period === CURRENT_PAYROLL_PERIOD ? "DRAFT" : "PAID",
 ): PayrollRecord {
   return {
     id: `pay-${employee.id}-${period}`,
@@ -28,7 +32,7 @@ export function buildPayrollRecord(
     period,
     ...historicalAmounts(employee, period),
     status,
-    payslipAvailable: true,
+    payslipAvailable: status !== "DRAFT",
   };
 }
 

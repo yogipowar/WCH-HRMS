@@ -22,8 +22,8 @@ export function AppHeader({ user, onLogout }: AppHeaderProps) {
   const toggle = useSidebarStore((state) => state.toggle);
 
   return (
-    <header className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur">
-      <div className="flex h-16 items-center justify-between gap-3 px-4">
+    <header className="sticky top-0 z-30 border-b border-border/80 bg-card">
+      <div className="flex h-14 items-center justify-between gap-3 px-4 sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
           {user.role === "EMPLOYEE" ? (
             <BrandLogo priority className="max-h-8 max-w-[168px] lg:hidden" />

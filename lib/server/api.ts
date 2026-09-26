@@ -23,6 +23,7 @@ import type {
   User,
 } from "@/types";
 import { DOCUMENT_TYPES, LEAVE_TYPES } from "@/types";
+import { isPayslipReleased } from "@/lib/payroll/record";
 import { todayIsoDate } from "@/lib/utils/format";
 
 type Json = Record<string, unknown>;
@@ -737,7 +738,13 @@ export async function handleApiRequest(request: Request, parts: string[]) {
     }
 
     if (parts[0] === "bootstrap" && request.method === "GET") {
-      return jsonResponse(200, await loadBootstrap());
+      const data = await loadBootstrap();
+      if (user.role !== "MANAGEMENT") {
+        data.payrollRecords = data.payrollRecords.filter(
+          (item) => item.employeeId === user.employeeId && isPayslipReleased(item),
+        );
+      }
+      return jsonResponse(200, data);
     }
 
     if (parts[0] === "employees" && request.method === "POST") {
@@ -883,6 +890,22 @@ export async function handleApiRequest(request: Request, parts: string[]) {
         [item.id, item.title, item.description, item.audience, item.departmentId, item.publishDate, item.status, item.createdBy],
       );
       return jsonResponse(200, item);
+    }
+
+    if (parts[0] === "payroll" && parts[1] && request.method === "PATCH") {
+      if (user.role !== "MANAGEMENT") {
+        return jsonResponse(403, { error: "Only administrators can update payroll status." });
+      }
+      const item = (await request.json()) as PayrollRecord;
+      if (item.status !== "DRAFT" && item.status !== "PROCESSED" && item.status !== "PAID") {
+        return jsonResponse(400, { error: "Invalid payroll status." });
+      }
+      await upsertPayroll({
+        ...item,
+        id: parts[1],
+        payslipAvailable: item.status === "PROCESSED" || item.status === "PAID",
+      });
+      return jsonResponse(200, { ok: true });
     }
 
     if (parts[0] === "announcements" && parts[1] && request.method === "PATCH") {

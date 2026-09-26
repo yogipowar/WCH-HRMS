@@ -1,4 +1,4 @@
-import { eachDayOfInterval, format, parseISO, subDays } from "date-fns";
+import { eachDayOfInterval, endOfWeek, format, parseISO, startOfWeek, subDays, subWeeks } from "date-fns";
 import type { AppData } from "@/data/mock-data";
 import { summarizeAttendance } from "@/lib/attendance/calculations";
 import { findOpenAttendance } from "@/lib/attendance/session";
@@ -103,6 +103,56 @@ export function liveAttendanceRows(data: AppData, date: string, now = new Date()
         department: getDepartmentName(data, employee.departmentId),
       };
     });
+}
+
+export function employeeDailyHours(records: AttendanceRecord[], employeeId: string, end = new Date(), days = 14) {
+  return eachDayOfInterval({ start: subDays(end, days - 1), end }).map((day) => {
+    const date = format(day, "yyyy-MM-dd");
+    const record = records.find((item) => item.employeeId === employeeId && item.date === date);
+    return {
+      label: format(day, "dd MMM"),
+      hours: record ? Number((record.activeWorkingMinutes / 60).toFixed(1)) : 0,
+    };
+  });
+}
+
+export function employeeWeeklyHours(
+  records: AttendanceRecord[],
+  employeeId: string,
+  requiredHours: number,
+  end = new Date(),
+  weeks = 5,
+) {
+  return Array.from({ length: weeks }, (_, index) => {
+    const weekEnd = endOfWeek(subWeeks(end, weeks - 1 - index), { weekStartsOn: 1 });
+    const weekStart = startOfWeek(weekEnd, { weekStartsOn: 1 });
+    const days = eachDayOfInterval({ start: weekStart, end: weekEnd > end ? end : weekEnd });
+    const weekRecords = records.filter(
+      (item) => item.employeeId === employeeId && item.date >= format(weekStart, "yyyy-MM-dd") && item.date <= format(weekEnd, "yyyy-MM-dd"),
+    );
+    const workedHours = weekRecords.reduce((sum, item) => sum + item.activeWorkingMinutes, 0) / 60;
+    const scheduledHours = days.length * requiredHours;
+    return {
+      label: `Week ${index + 1}`,
+      scheduled: Number(scheduledHours.toFixed(1)),
+      worked: Number(workedHours.toFixed(1)),
+      average: days.length ? Number((workedHours / days.length).toFixed(1)) : 0,
+    };
+  });
+}
+
+export function attendanceFlagTrend(records: AttendanceRecord[], end = new Date(), days = 14) {
+  return eachDayOfInterval({ start: subDays(end, days - 1), end }).map((day) => {
+    const date = format(day, "yyyy-MM-dd");
+    const dayRecords = records.filter((item) => item.date === date);
+    return {
+      label: format(day, "dd MMM"),
+      present: dayRecords.filter((item) => isPresentAttendance(item.status)).length,
+      late: dayRecords.filter((item) => item.status === "LATE").length,
+      leave: dayRecords.filter((item) => item.status === "ON_LEAVE").length,
+      absent: dayRecords.filter((item) => item.status === "ABSENT").length,
+    };
+  });
 }
 
 export function dateLabel(value: string) {

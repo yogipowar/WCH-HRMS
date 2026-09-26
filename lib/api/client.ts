@@ -114,4 +114,7 @@ export const api = {
   updateSettings(body: unknown) {
     return request("/api/settings", { method: "PATCH", body: JSON.stringify(body) });
   },
+  updatePayroll(id: string, body: unknown) {
+    return request(`/api/payroll/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+  },
 };

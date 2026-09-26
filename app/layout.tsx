@@ -24,10 +24,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${inter.variable} h-full`} data-theme="navy" suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} h-full`} data-theme="atlantic" suppressHydrationWarning>
       <body className="min-h-full font-sans antialiased" suppressHydrationWarning>
         <Script id="color-theme-boot" strategy="beforeInteractive">
-          {`try{var t=JSON.parse(localStorage.getItem("wch-hrms.color-theme")||"{}").state?.colorTheme;var m={sky:"atlantic",ocean:"teal",forest:"olive",sunset:"graphite",violet:"indigo"};var id=m[t]||t;if(id)document.documentElement.dataset.theme=id;}catch(e){}`}
+          {`try{var raw=localStorage.getItem("wch-hrms.color-theme.v2")||localStorage.getItem("wch-hrms.color-theme")||"{}";var t=JSON.parse(raw).state?.colorTheme;var m={sky:"atlantic",ocean:"teal",forest:"olive",sunset:"graphite",violet:"indigo"};var id=m[t]||t||"atlantic";document.documentElement.dataset.theme=id;}catch(e){}`}
         </Script>
         <AppProviders>{children}</AppProviders>
       </body>

@@ -30,7 +30,13 @@ function buildEvents(record: AttendanceRecord): TimelineEvent[] {
   return events.sort((a, b) => a.time.localeCompare(b.time));
 }
 
-export function AttendanceTimeline({ record }: { record: AttendanceRecord }) {
+export function AttendanceTimeline({
+  record,
+  compact = false,
+}: {
+  record: AttendanceRecord;
+  compact?: boolean;
+}) {
   const events = buildEvents(record);
 
   if (events.length === 0) {
@@ -38,18 +44,18 @@ export function AttendanceTimeline({ record }: { record: AttendanceRecord }) {
   }
 
   return (
-    <ol className="space-y-4">
+    <ol className={compact ? "space-y-2" : "space-y-4"}>
       {events.map((event, index) => {
         const Icon = event.icon;
         return (
           <li key={event.id} className="flex gap-3">
             <div className="flex flex-col items-center">
-              <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <Icon className="size-4" />
+              <div className={`flex items-center justify-center rounded-full bg-primary/10 text-primary ${compact ? "size-7" : "size-8"}`}>
+                <Icon className="size-3.5" />
               </div>
               {index < events.length - 1 ? <div className="mt-1 w-px flex-1 bg-border" /> : null}
             </div>
-            <div className="pb-2">
+            <div className={compact ? "pb-1" : "pb-2"}>
               <p className="text-sm font-medium">{event.label}</p>
               <p className="text-xs text-muted-foreground">{formatTime(event.time)}</p>
             </div>

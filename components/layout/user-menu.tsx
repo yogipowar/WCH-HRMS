@@ -25,11 +25,11 @@ export function UserMenu({ user, onLogout }: UserMenuProps) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-muted">
+      <DropdownMenuTrigger className="flex items-center gap-2 rounded-full p-0.5 text-left hover:bg-muted">
         <Avatar className="size-8">
           <AvatarFallback>{initials(user.name)}</AvatarFallback>
         </Avatar>
-        <span className="hidden text-sm font-medium sm:block">{user.name}</span>
+        <span className="sr-only">{user.name}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuGroup>
