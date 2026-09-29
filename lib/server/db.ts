@@ -61,6 +61,9 @@ async function resetPool() {
   schemaReady = false;
   documentColumnsReady = false;
   leaveColumnsReady = false;
+  lateRemovalTableReady = false;
+  employeeScheduleColumnsReady = false;
+  projectsTableReady = false;
   if (current) {
     await current.end().catch(() => undefined);
   }
@@ -82,6 +85,9 @@ export async function getPool(): Promise<Pool> {
     await pool.query(schema);
     await ensureDocumentFileColumns(pool);
     await ensureLeaveAttachmentColumns(pool);
+    await ensureLateRemovalTable(pool);
+    await ensureEmployeeScheduleColumns(pool);
+    await ensureProjectsTable(pool);
     schemaReady = true;
   }
   return pool;
@@ -133,6 +139,77 @@ export async function ensureLeaveAttachmentColumns(db?: Pool) {
     await pool.query("ALTER TABLE leave_requests ADD COLUMN attachment_data LONGBLOB NULL");
   }
   leaveColumnsReady = true;
+}
+
+let lateRemovalTableReady = false;
+
+export async function ensureLateRemovalTable(db?: Pool) {
+  if (lateRemovalTableReady) return;
+  const pool = db ?? (await getPool());
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS late_removal_requests (
+      id VARCHAR(64) PRIMARY KEY,
+      employee_id VARCHAR(64) NOT NULL,
+      attendance_id VARCHAR(64) NOT NULL,
+      attendance_date DATE NOT NULL,
+      late_minutes INT NOT NULL DEFAULT 0,
+      active_working_minutes INT NOT NULL DEFAULT 0,
+      required_hours DECIMAL(4,1) NOT NULL,
+      reason TEXT NOT NULL,
+      status VARCHAR(32) NOT NULL,
+      rejection_reason TEXT NULL,
+      reviewed_by VARCHAR(64) NULL,
+      reviewed_at VARCHAR(64) NULL,
+      created_at VARCHAR(64) NOT NULL,
+      UNIQUE KEY late_removal_attendance (attendance_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  lateRemovalTableReady = true;
+}
+
+let employeeScheduleColumnsReady = false;
+
+export async function ensureEmployeeScheduleColumns(db?: Pool) {
+  if (employeeScheduleColumnsReady) return;
+  const pool = db ?? (await getPool());
+  const [columns] = await pool.query<RowDataPacket[]>(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employees'`,
+  );
+  const names = new Set(columns.map((row) => String(row.COLUMN_NAME)));
+  if (!names.has("work_start_time")) {
+    await pool.query("ALTER TABLE employees ADD COLUMN work_start_time VARCHAR(8) NOT NULL DEFAULT '09:30'");
+  }
+  if (!names.has("late_after_minutes")) {
+    await pool.query("ALTER TABLE employees ADD COLUMN late_after_minutes INT NOT NULL DEFAULT 10");
+  }
+  employeeScheduleColumnsReady = true;
+}
+
+let projectsTableReady = false;
+
+export async function ensureProjectsTable(db?: Pool) {
+  if (projectsTableReady) return;
+  const pool = db ?? (await getPool());
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS projects (
+      id VARCHAR(64) PRIMARY KEY,
+      serial_no INT NOT NULL,
+      website_name VARCHAR(255) NOT NULL,
+      website_url TEXT NOT NULL,
+      login_username VARCHAR(255) NOT NULL DEFAULT '',
+      login_password VARCHAR(255) NOT NULL DEFAULT '',
+      technology_used TEXT NOT NULL,
+      figma_link TEXT NOT NULL,
+      remark TEXT NOT NULL,
+      project_manager_id VARCHAR(64) NULL,
+      team_member_ids LONGTEXT NOT NULL,
+      created_at VARCHAR(64) NOT NULL,
+      updated_at VARCHAR(64) NOT NULL,
+      UNIQUE KEY projects_serial_no (serial_no)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  projectsTableReady = true;
 }
 
 export async function query<T extends RowDataPacket>(sql: string, params: unknown[] = []) {

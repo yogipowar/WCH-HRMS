@@ -3,6 +3,10 @@ import {
   computeStoredAttendanceMetrics,
   getActiveBreak,
 } from "@/lib/attendance/calculations";
+import {
+  countableLateMarksInMonth,
+  shouldApplyHalfDayForLate,
+} from "@/lib/attendance/late-policy";
 import { findOpenAttendance } from "@/lib/attendance/session";
 import { getNextState, validateAttendanceAction } from "@/lib/attendance/state-machine";
 import { dayKind, weeklyOffReason } from "@/lib/attendance/work-calendar";
@@ -21,6 +25,15 @@ function todayDate(now = new Date()): string {
   return format(now, "yyyy-MM-dd");
 }
 
+function employeeRequiredHours(employeeId: string): number {
+  const employee = getData().employees.find((item) => item.id === employeeId);
+  const hours = Number(employee?.dailyRequiredHours);
+  if (Number.isFinite(hours) && hours > 0) {
+    return hours;
+  }
+  return REQUIRED_DAILY_HOURS;
+}
+
 function emptyRecord(
   employeeId: string,
   date: string,
@@ -34,7 +47,7 @@ function emptyRecord(
     clockOut: null,
     state: "NOT_CLOCKED_IN",
     status,
-    requiredHours: REQUIRED_DAILY_HOURS,
+    requiredHours: employeeRequiredHours(employeeId),
     activeWorkingMinutes: 0,
     breakMinutes: 0,
     workSession: null,
@@ -51,22 +64,36 @@ function persistRecord(record: AttendanceRecord): AttendanceRecord {
 
 function recordForDate(employeeId: string, date: string): AttendanceRecord {
   const data = getData();
+  const requiredHours = employeeRequiredHours(employeeId);
   const existing = data.attendanceRecords.find(
     (item) => item.employeeId === employeeId && item.date === date,
   );
   if (existing?.clockIn) {
+    // Keep completed days as stored; refresh target for open sessions from employee profile.
+    if (!existing.clockOut && existing.requiredHours !== requiredHours) {
+      return { ...existing, requiredHours };
+    }
     return existing;
   }
 
   const kind = dayKind(date, data.settings, data.holidays);
   if (kind === "WEEKLY_OFF") {
-    return existing ? { ...existing, status: "WEEKLY_OFF" } : emptyRecord(employeeId, date, "WEEKLY_OFF");
+    return existing
+      ? { ...existing, status: "WEEKLY_OFF", requiredHours }
+      : emptyRecord(employeeId, date, "WEEKLY_OFF");
   }
   if (kind === "HOLIDAY") {
-    return existing ? { ...existing, status: "HOLIDAY" } : emptyRecord(employeeId, date, "HOLIDAY");
+    return existing
+      ? { ...existing, status: "HOLIDAY", requiredHours }
+      : emptyRecord(employeeId, date, "HOLIDAY");
   }
 
-  return existing ?? emptyRecord(employeeId, date);
+  if (existing) {
+    return existing.requiredHours === requiredHours
+      ? existing
+      : { ...existing, requiredHours };
+  }
+  return emptyRecord(employeeId, date);
 }
 
 function applyAction(
@@ -91,7 +118,13 @@ function applyAction(
     throw new Error(`Clock-in is not available. ${reason}`);
   }
 
-  const current = action === "CLOCK_IN" ? recordForDate(employeeId, date) : (open ?? recordForDate(employeeId, date));
+  const currentRaw =
+    action === "CLOCK_IN" ? recordForDate(employeeId, date) : (open ?? recordForDate(employeeId, date));
+  const requiredHours = employeeRequiredHours(employeeId);
+  const current =
+    !currentRaw.clockOut && currentRaw.requiredHours !== requiredHours
+      ? { ...currentRaw, requiredHours }
+      : currentRaw;
 
   const validation = validateAttendanceAction(current, action);
   if (!validation.allowed) {
@@ -103,11 +136,15 @@ function applyAction(
 
   switch (action) {
     case "CLOCK_IN": {
-      const workStart = data.settings.workStartTime;
+      const employee = data.employees.find((item) => item.id === employeeId);
+      const workStart = employee?.workStartTime || data.settings.workStartTime;
+      const lateAfterMinutes = Number.isFinite(Number(employee?.lateAfterMinutes))
+        ? Number(employee?.lateAfterMinutes)
+        : data.settings.lateAfterMinutes;
       const [hours, minutes] = workStart.split(":").map(Number);
       const start = new Date(now);
       start.setHours(hours, minutes, 0, 0);
-      const graceEnd = start.getTime() + data.settings.lateAfterMinutes * 60000;
+      const graceEnd = start.getTime() + lateAfterMinutes * 60000;
       const lateMinutes =
         now.getTime() > graceEnd
           ? Math.round((now.getTime() - start.getTime()) / 60000)
@@ -118,6 +155,7 @@ function applyAction(
         state: getNextState(action),
         status: lateMinutes > 0 ? "LATE" : "PRESENT",
         lateMinutes: Math.max(0, lateMinutes),
+        requiredHours: employeeRequiredHours(employeeId),
         workSession: { startTime: timestamp, endTime: null },
       };
       break;
@@ -131,7 +169,21 @@ function applyAction(
           ? { ...next.workSession, endTime: timestamp }
           : { startTime: next.clockIn ?? timestamp, endTime: timestamp },
       });
-      next.status = next.activeWorkingMinutes >= next.requiredHours * 60 ? "COMPLETED" : "INCOMPLETE";
+      const completed = next.activeWorkingMinutes >= next.requiredHours * 60;
+      if (!completed) {
+        next.status = "INCOMPLETE";
+      } else if (next.lateMinutes > 0) {
+        const priorLates = countableLateMarksInMonth(
+          data.attendanceRecords,
+          data.lateRemovalRequests,
+          employeeId,
+          next.date,
+          next.id,
+        );
+        next.status = shouldApplyHalfDayForLate(priorLates) ? "HALF_DAY" : "LATE";
+      } else {
+        next.status = "COMPLETED";
+      }
       break;
     }
     case "START_LUNCH":
@@ -198,7 +250,11 @@ export const attendanceService = {
   },
   getTodayAttendance(employeeId: string, now = new Date()) {
     const open = findOpenAttendance(getData().attendanceRecords, employeeId);
-    return open ?? recordForDate(employeeId, todayDate(now));
+    if (open) {
+      const requiredHours = employeeRequiredHours(employeeId);
+      return open.requiredHours === requiredHours ? open : { ...open, requiredHours };
+    }
+    return recordForDate(employeeId, todayDate(now));
   },
   getAttendanceById(id: string) {
     return getData().attendanceRecords.find((item) => item.id === id) ?? null;

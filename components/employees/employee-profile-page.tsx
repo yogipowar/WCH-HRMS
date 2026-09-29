@@ -144,8 +144,12 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
         </TabsContent>
         <TabsContent value="hours">
           <Card>
-            <CardContent className="p-5 text-sm">
-              Daily required hours: {employee.dailyRequiredHours}h. Breaks are excluded from active working time.
+            <CardContent className="space-y-2 p-5 text-sm">
+              <p>Daily required hours: {employee.dailyRequiredHours}h. Breaks are excluded from active working time.</p>
+              <p>Work start: {employee.workStartTime || data.settings.workStartTime}</p>
+              <p>
+                Late after: {employee.lateAfterMinutes ?? data.settings.lateAfterMinutes} minutes past work start
+              </p>
             </CardContent>
           </Card>
         </TabsContent>

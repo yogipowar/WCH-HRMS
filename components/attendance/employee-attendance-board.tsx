@@ -8,15 +8,16 @@ import {
 } from "@/components/attendance/attendance-control-card";
 import { AttendanceTimeline } from "@/components/attendance/attendance-timeline";
 import { BreakSummary } from "@/components/attendance/break-summary";
+import { LateRemovalRequestPanel } from "@/components/attendance/late-removal-panel";
 import { WorkHoursProgress } from "@/components/attendance/work-hours-progress";
 import { AttendanceStatusBadge, LiveStatusBadge } from "@/components/shared/status-badge";
 import { LinkButton } from "@/components/shared/link-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDuration, summarizeAttendance } from "@/lib/attendance/calculations";
 import { isOpenAttendance } from "@/lib/attendance/session";
-import { getStateLabel } from "@/lib/attendance/state-machine";
 import { toLiveStatus } from "@/lib/lookups";
-import { formatDate, formatTime } from "@/lib/utils/format";
+import { useDataStore } from "@/lib/stores/data-store";
+import { formatClockTime, formatDate, formatTime } from "@/lib/utils/format";
 import type { AttendanceRecord } from "@/types";
 
 export function EmployeeAttendanceBoard({
@@ -28,6 +29,10 @@ export function EmployeeAttendanceBoard({
 }) {
   const session = useAttendanceSession(employeeId);
   const { now, record, summary, offReason } = session;
+  const employee = useDataStore((state) => state.employees.find((item) => item.id === employeeId));
+  const settings = useDataStore((state) => state.settings);
+  const workStartTime = employee?.workStartTime || settings.workStartTime;
+  const lateAfterMinutes = employee?.lateAfterMinutes ?? settings.lateAfterMinutes;
 
   return (
     <div className="space-y-4">
@@ -41,6 +46,10 @@ export function EmployeeAttendanceBoard({
                 {record.clockIn
                   ? `You signed in today at ${formatTime(record.clockIn)}`
                   : offReason ?? "You have not clocked in yet."}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Your work start: {formatClockTime(workStartTime)}
+                {lateAfterMinutes > 0 ? ` · late after ${lateAfterMinutes} min` : null}
               </p>
               {record.clockIn && !record.clockOut && record.date !== format(now, "yyyy-MM-dd") ? (
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -56,7 +65,7 @@ export function EmployeeAttendanceBoard({
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <MetricTile label="Status" value={getStateLabel(record.state)} />
+            <MetricTile label="Work start" value={formatClockTime(workStartTime)} />
             <MetricTile label="Clock in" value={formatTime(record.clockIn)} />
             <MetricTile label="Active work" value={formatDuration(summary.activeWorkingMinutes)} />
             <MetricTile label="Remaining" value={formatDuration(summary.remainingMinutes)} />
@@ -64,6 +73,8 @@ export function EmployeeAttendanceBoard({
           <AttendanceButtons session={session} layout="toolbar" />
         </CardContent>
       </Card>
+
+      <LateRemovalRequestPanel record={record} />
 
       <div className="grid items-stretch gap-4 xl:grid-cols-3">
         <Card className="h-full">

@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS employees (
   work_location VARCHAR(255) NOT NULL,
   status VARCHAR(32) NOT NULL,
   daily_required_hours DECIMAL(4,1) NOT NULL,
+  work_start_time VARCHAR(8) NOT NULL DEFAULT '09:30',
+  late_after_minutes INT NOT NULL DEFAULT 10,
   basic_salary DECIMAL(12,2) NOT NULL DEFAULT 0,
   allowances DECIMAL(12,2) NOT NULL DEFAULT 0,
   deductions DECIMAL(12,2) NOT NULL DEFAULT 0,
@@ -99,6 +101,23 @@ CREATE TABLE IF NOT EXISTS leave_requests (
   created_at VARCHAR(64) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS late_removal_requests (
+  id VARCHAR(64) PRIMARY KEY,
+  employee_id VARCHAR(64) NOT NULL,
+  attendance_id VARCHAR(64) NOT NULL,
+  attendance_date DATE NOT NULL,
+  late_minutes INT NOT NULL DEFAULT 0,
+  active_working_minutes INT NOT NULL DEFAULT 0,
+  required_hours DECIMAL(4,1) NOT NULL,
+  reason TEXT NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  rejection_reason TEXT NULL,
+  reviewed_by VARCHAR(64) NULL,
+  reviewed_at VARCHAR(64) NULL,
+  created_at VARCHAR(64) NOT NULL,
+  UNIQUE KEY late_removal_attendance (attendance_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS holidays (
   id VARCHAR(64) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
@@ -128,6 +147,23 @@ CREATE TABLE IF NOT EXISTS announcements (
   publish_date DATE NOT NULL,
   status VARCHAR(32) NOT NULL,
   created_by VARCHAR(64) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS projects (
+  id VARCHAR(64) PRIMARY KEY,
+  serial_no INT NOT NULL,
+  website_name VARCHAR(255) NOT NULL,
+  website_url TEXT NOT NULL,
+  login_username VARCHAR(255) NOT NULL DEFAULT '',
+  login_password VARCHAR(255) NOT NULL DEFAULT '',
+  technology_used TEXT NOT NULL,
+  figma_link TEXT NOT NULL,
+  remark TEXT NOT NULL,
+  project_manager_id VARCHAR(64) NULL,
+  team_member_ids LONGTEXT NOT NULL,
+  created_at VARCHAR(64) NOT NULL,
+  updated_at VARCHAR(64) NOT NULL,
+  UNIQUE KEY projects_serial_no (serial_no)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS documents (

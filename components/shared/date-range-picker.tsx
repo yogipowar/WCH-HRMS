@@ -13,13 +13,17 @@ interface DateRangePickerProps {
   onChange: (value: DateRange | undefined) => void;
 }
 
-export function DateRangePicker({ value, onChange }: DateRangePickerProps) {
+export function DateRangePicker({
+  value,
+  onChange,
+  placeholder = "Joining date range",
+}: DateRangePickerProps & { placeholder?: string }) {
   const label =
     value?.from && value.to
       ? `${format(value.from, "dd MMM")} - ${format(value.to, "dd MMM yyyy")}`
       : value?.from
         ? format(value.from, "dd MMM yyyy")
-        : "Custom date range";
+        : placeholder;
 
   return (
     <Popover>

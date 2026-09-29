@@ -28,6 +28,7 @@ const attendanceTone: Record<AttendanceStatus, string> = {
   PRESENT: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
   COMPLETED: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
   LATE: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  HALF_DAY: "bg-orange-500/10 text-orange-700 dark:text-orange-300",
   INCOMPLETE: "bg-orange-500/10 text-orange-700 dark:text-orange-300",
   ABSENT: "bg-destructive/10 text-destructive",
   ON_LEAVE: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300",

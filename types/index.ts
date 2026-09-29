@@ -31,6 +31,7 @@ export const ATTENDANCE_STATUSES = [
   "ON_LEAVE",
   "INCOMPLETE",
   "COMPLETED",
+  "HALF_DAY",
   "WEEKLY_OFF",
   "HOLIDAY",
 ] as const;
@@ -106,6 +107,9 @@ export const NOTIFICATION_TYPES = [
   "LEAVE_PENDING",
   "ATTENDANCE_REMINDER",
   "LATE_ARRIVAL",
+  "LATE_REMOVAL_PENDING",
+  "LATE_REMOVAL_APPROVED",
+  "LATE_REMOVAL_REJECTED",
   "HOLIDAY",
   "ANNOUNCEMENT",
   "PROFILE_UPDATE",
@@ -173,6 +177,8 @@ export interface Employee {
   workLocation: string;
   status: EmployeeStatus;
   dailyRequiredHours: number;
+  workStartTime: string;
+  lateAfterMinutes: number;
   basicSalary: number;
   allowances: number;
   deductions: number;
@@ -250,6 +256,27 @@ export interface LeaveRequest {
   createdAt: string;
 }
 
+export interface LateRemovalRequest {
+  id: string;
+  employeeId: string;
+  attendanceId: string;
+  attendanceDate: string;
+  lateMinutes: number;
+  activeWorkingMinutes: number;
+  requiredHours: number;
+  reason: string;
+  status: LeaveStatus;
+  rejectionReason: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+}
+
+/** Max late-removal requests an employee may submit per calendar month. */
+export const LATE_REMOVAL_MONTHLY_LIMIT = 7;
+/** Countable late marks allowed before each further late becomes a half day. */
+export const LATE_MARKS_BEFORE_HALF_DAY = 3;
+
 export interface Holiday {
   id: string;
   name: string;
@@ -257,6 +284,22 @@ export interface Holiday {
   type: HolidayType;
   description: string;
   recurring: boolean;
+}
+
+export interface Project {
+  id: string;
+  serialNo: number;
+  websiteName: string;
+  websiteUrl: string;
+  loginUsername: string;
+  loginPassword: string;
+  technologyUsed: string;
+  figmaLink: string;
+  remark: string;
+  projectManagerId: string | null;
+  teamMemberIds: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Notification {
@@ -351,7 +394,7 @@ export type AttendanceAction =
 
 export interface SearchResult {
   id: string;
-  type: "employee" | "department" | "leave" | "attendance" | "announcement" | "holiday" | "document";
+  type: "employee" | "department" | "leave" | "attendance" | "announcement" | "holiday" | "document" | "project";
   title: string;
   subtitle: string;
   href: string;

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AppHeader } from "@/components/layout/app-header";
 import { AppSidebar } from "@/components/layout/app-sidebar";
-import { EmployeeMobileTabBar } from "@/components/layout/employee-mobile-tab-bar";
+import { MobileTabBar } from "@/components/layout/mobile-tab-bar";
 import { MANAGEMENT_ONLY_PREFIXES } from "@/lib/constants";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { useDataStore } from "@/lib/stores/data-store";
@@ -49,18 +49,16 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     return <div className="min-h-screen bg-background" />;
   }
 
-  const isEmployee = user.role === "EMPLOYEE";
-
   return (
     <div className="flex min-h-screen bg-background">
       <AppSidebar role={user.role} />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader user={user} onLogout={logout} />
-        <main className={`flex-1 overflow-x-hidden px-4 py-5 sm:px-6 lg:px-7 ${isEmployee ? "pb-24 lg:pb-6" : ""}`}>
+        <main className="flex-1 overflow-x-hidden px-4 py-5 pb-24 sm:px-6 lg:px-7 lg:pb-6">
           {children}
         </main>
       </div>
-      {isEmployee ? <EmployeeMobileTabBar /> : null}
+      <MobileTabBar role={user.role} />
     </div>
   );
 }

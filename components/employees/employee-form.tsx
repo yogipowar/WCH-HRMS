@@ -18,7 +18,7 @@ import { useDataStore } from "@/lib/stores/data-store";
 import { employeeFormSchema, type EmployeeFormValues } from "@/lib/validations/employee";
 import type { Employee } from "@/types";
 
-const defaults: EmployeeFormValues = {
+const baseDefaults: EmployeeFormValues = {
   fullName: "",
   dateOfBirth: "",
   gender: "MALE",
@@ -35,6 +35,8 @@ const defaults: EmployeeFormValues = {
   workLocation: "Pune",
   status: "ACTIVE",
   dailyRequiredHours: 9,
+  workStartTime: "09:30",
+  lateAfterMinutes: 10,
   basicSalary: 0,
   allowances: 0,
   deductions: 0,
@@ -50,9 +52,18 @@ const defaults: EmployeeFormValues = {
   bankIfsc: "",
 };
 
-function toDefaults(employee?: Employee, username = ""): EmployeeFormValues {
+function toDefaults(
+  employee: Employee | undefined,
+  username: string,
+  settings: { defaultDailyHours: number; workStartTime: string; lateAfterMinutes: number },
+): EmployeeFormValues {
   if (!employee) {
-    return defaults;
+    return {
+      ...baseDefaults,
+      dailyRequiredHours: settings.defaultDailyHours || 9,
+      workStartTime: settings.workStartTime || "09:30",
+      lateAfterMinutes: settings.lateAfterMinutes ?? 10,
+    };
   }
   return {
     fullName: employee.fullName,
@@ -71,6 +82,8 @@ function toDefaults(employee?: Employee, username = ""): EmployeeFormValues {
     workLocation: employee.workLocation,
     status: employee.status,
     dailyRequiredHours: employee.dailyRequiredHours,
+    workStartTime: employee.workStartTime || settings.workStartTime || "09:30",
+    lateAfterMinutes: employee.lateAfterMinutes ?? settings.lateAfterMinutes ?? 10,
     basicSalary: employee.basicSalary,
     allowances: employee.allowances,
     deductions: employee.deductions,
@@ -93,11 +106,12 @@ export function EmployeeForm({ employee }: { employee?: Employee }) {
   const designations = useDataStore((state) => state.designations);
   const employees = useDataStore((state) => state.employees);
   const users = useDataStore((state) => state.users);
+  const settings = useDataStore((state) => state.settings);
   const [showPassword, setShowPassword] = useState(false);
   const account = users.find((item) => item.id === employee?.userId);
   const form = useForm<EmployeeFormValues>({
     resolver: zodResolver(employeeFormSchema),
-    defaultValues: toDefaults(employee, account?.username ?? ""),
+    defaultValues: toDefaults(employee, account?.username ?? "", settings),
   });
 
   async function onSubmit(values: EmployeeFormValues) {
@@ -138,6 +152,8 @@ export function EmployeeForm({ employee }: { employee?: Employee }) {
       workLocation: values.workLocation,
       status: values.status,
       dailyRequiredHours: values.dailyRequiredHours,
+      workStartTime: values.workStartTime,
+      lateAfterMinutes: values.lateAfterMinutes,
       basicSalary: values.basicSalary,
       allowances: values.allowances,
       deductions: values.deductions,
@@ -266,6 +282,15 @@ export function EmployeeForm({ employee }: { employee?: Employee }) {
         <Field label="Daily required hours" error={form.formState.errors.dailyRequiredHours?.message}>
           <Input type="number" min={1} max={16} {...form.register("dailyRequiredHours", { valueAsNumber: true })} />
         </Field>
+        <Field label="Work start" error={form.formState.errors.workStartTime?.message}>
+          <Input type="time" {...form.register("workStartTime")} />
+        </Field>
+        <Field label="Late after (minutes)" error={form.formState.errors.lateAfterMinutes?.message}>
+          <Input type="number" min={0} max={180} {...form.register("lateAfterMinutes", { valueAsNumber: true })} />
+        </Field>
+        <p className="md:col-span-3 text-xs text-muted-foreground">
+          Work start and late grace default from Settings. Change them here only for this employee.
+        </p>
       </Section>
 
       <Section title="Login credentials">

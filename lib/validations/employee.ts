@@ -17,6 +17,8 @@ export const employeeFormSchema = z.object({
   workLocation: z.string().min(2, "Work location is required"),
   status: z.enum(["ACTIVE", "INACTIVE"]),
   dailyRequiredHours: z.number().min(1).max(16),
+  workStartTime: z.string().min(1, "Work start time is required"),
+  lateAfterMinutes: z.number().min(0).max(180),
   basicSalary: z.number().min(1, "Basic salary is required"),
   allowances: z.number().min(0, "Allowances cannot be negative"),
   deductions: z.number().min(0, "Deductions cannot be negative"),

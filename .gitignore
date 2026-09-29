@@ -41,3 +41,12 @@ backend/php/config.local.php
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# android wrapper
+.android-sdk/
+android-app/.gradle/
+android-app/build/
+android-app/app/build/
+android-app/local.properties
+*.apk
+*.ap_

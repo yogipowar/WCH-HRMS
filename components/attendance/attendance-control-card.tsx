@@ -11,18 +11,21 @@ import { LiveStatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { summarizeAttendance, formatDuration } from "@/lib/attendance/calculations";
-import { getStateLabel } from "@/lib/attendance/state-machine";
 import { dayKind, weeklyOffReason } from "@/lib/attendance/work-calendar";
 import { toLiveStatus } from "@/lib/lookups";
 import { attendanceService } from "@/lib/services/attendanceService";
 import { useDataStore } from "@/lib/stores/data-store";
 import { cn } from "@/lib/utils";
-import { formatTime } from "@/lib/utils/format";
+import { formatClockTime, formatTime } from "@/lib/utils/format";
 
 export function useAttendanceSession(employeeId: string) {
   const records = useDataStore((state) => state.attendanceRecords);
   const settings = useDataStore((state) => state.settings);
+  const employees = useDataStore((state) => state.employees);
   const holidays = useDataStore((state) => state.holidays);
+  const employee = employees.find((item) => item.id === employeeId);
+  const workStartTime = employee?.workStartTime || settings.workStartTime;
+  const lateAfterMinutes = employee?.lateAfterMinutes ?? settings.lateAfterMinutes;
   const [now, setNow] = useState(() => new Date());
   const [clockOutOpen, setClockOutOpen] = useState(false);
 
@@ -57,7 +60,18 @@ export function useAttendanceSession(employeeId: string) {
     }
   }
 
-  return { now, record, summary, offReason, clockOutOpen, setClockOutOpen, runAction, employeeId };
+  return {
+    now,
+    record,
+    summary,
+    offReason,
+    clockOutOpen,
+    setClockOutOpen,
+    runAction,
+    employeeId,
+    workStartTime,
+    lateAfterMinutes,
+  };
 }
 
 export function AttendanceButtons({
@@ -167,7 +181,7 @@ export function AttendanceControlCard({
   compact?: boolean;
 }) {
   const session = useAttendanceSession(employeeId);
-  const { now, record, summary, offReason } = session;
+  const { now, record, summary, offReason, workStartTime, lateAfterMinutes } = session;
 
   return (
     <Card>
@@ -187,6 +201,10 @@ export function AttendanceControlCard({
               : offReason ?? "You have not clocked in yet."}
           </p>
           <p className="mt-2 text-4xl font-semibold tracking-tight tabular-nums">{format(now, "hh:mm:ss a")}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Your work start: {formatClockTime(workStartTime)}
+            {lateAfterMinutes > 0 ? ` · late after ${lateAfterMinutes} min` : null}
+          </p>
           {record.clockIn && !record.clockOut && record.date !== format(now, "yyyy-MM-dd") ? (
             <p className="mt-2 text-xs text-muted-foreground">
               Open since {format(parseISO(record.date), "dd MMM yyyy")}. Hours keep counting until clock out.
@@ -197,7 +215,7 @@ export function AttendanceControlCard({
         <AttendanceButtons session={session} layout="stack" />
 
         <div className="grid grid-cols-2 gap-3">
-          <Metric label="Status" value={getStateLabel(record.state)} />
+          <Metric label="Work start" value={formatClockTime(workStartTime)} />
           <Metric label="Clock in" value={formatTime(record.clockIn)} />
           <Metric label="Active work" value={formatDuration(summary.activeWorkingMinutes)} />
           <Metric label="Remaining" value={formatDuration(summary.remainingMinutes)} />

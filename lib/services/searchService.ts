@@ -70,6 +70,19 @@ export function searchApp(query: string, role: UserRole, userId: string): Search
       }
     });
   } else if (employee) {
+    data.employees
+      .filter((item) => item.status === "ACTIVE")
+      .forEach((item) => {
+        if (`${item.fullName} ${item.workEmail} ${item.employeeCode}`.toLowerCase().includes(q)) {
+          results.push({
+            id: item.id,
+            type: "employee",
+            title: item.fullName,
+            subtitle: `${item.employeeCode} · ${getDepartmentName(data, item.departmentId)}`,
+            href: `/team/${item.id}`,
+          });
+        }
+      });
     data.attendanceRecords
       .filter((item) => item.employeeId === employee.id && item.date.includes(q))
       .slice(0, 5)
@@ -132,6 +145,20 @@ export function searchApp(query: string, role: UserRole, userId: string): Search
           title: item.title,
           subtitle: item.status,
           href: "/announcements",
+        });
+      }
+    });
+
+  (data.projects ?? [])
+    .filter((item) => role === "MANAGEMENT" || (employee ? item.projectManagerId === employee.id || item.teamMemberIds.includes(employee.id) : false))
+    .forEach((item) => {
+      if (`${item.websiteName} ${item.websiteUrl} ${item.technologyUsed} ${item.remark}`.toLowerCase().includes(q)) {
+        results.push({
+          id: item.id,
+          type: "project",
+          title: item.websiteName,
+          subtitle: `Project #${item.serialNo}`,
+          href: "/projects",
         });
       }
     });

@@ -4,7 +4,6 @@ import { PanelLeft } from "lucide-react";
 import { BrandLogo } from "@/components/brand/logo";
 import { AppBreadcrumbs } from "@/components/layout/app-breadcrumbs";
 import { GlobalSearch } from "@/components/layout/global-search";
-import { MobileNav } from "@/components/layout/mobile-nav";
 import { NotificationDropdown } from "@/components/layout/notification-dropdown";
 import { ThemePicker } from "@/components/layout/theme-picker";
 import { UserMenu } from "@/components/layout/user-menu";
@@ -25,11 +24,7 @@ export function AppHeader({ user, onLogout }: AppHeaderProps) {
     <header className="sticky top-0 z-30 border-b border-border/80 bg-card">
       <div className="flex h-14 items-center justify-between gap-3 px-4 sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
-          {user.role === "EMPLOYEE" ? (
-            <BrandLogo priority className="max-h-8 max-w-[168px] lg:hidden" />
-          ) : (
-            <MobileNav role={user.role} />
-          )}
+          <BrandLogo priority className="max-h-8 max-w-[168px] lg:hidden" />
           {collapsed ? (
             <Button
               variant="ghost"

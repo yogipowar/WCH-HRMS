@@ -16,7 +16,9 @@ const LABELS: Record<string, string> = {
   attendance: "Attendance",
   history: "History",
   employees: "Employees",
+  team: "Team",
   new: "Add Employee",
+  edit: "Edit",
   departments: "Departments",
   designations: "Designations",
   leave: "Leave",
@@ -29,6 +31,7 @@ const LABELS: Record<string, string> = {
   announcements: "Announcements",
   notifications: "Notifications",
   documents: "Documents",
+  projects: "Projects",
   settings: "Settings",
   profile: "My Profile",
 };
@@ -46,7 +49,15 @@ export function AppBreadcrumbs() {
       <BreadcrumbList>
         {parts.map((part, index) => {
           const href = `/${parts.slice(0, index + 1).join("/")}`;
-          const label = LABELS[part] ?? decodeURIComponent(part);
+          const parent = parts[index - 1];
+          let label = LABELS[part] ?? decodeURIComponent(part);
+          if (part === "new" && parent === "projects") {
+            label = "Add Project";
+          } else if (part === "new" && parent === "employees") {
+            label = "Add Employee";
+          } else if (part === "edit" && parent && parts[index - 2] === "projects") {
+            label = "Edit Project";
+          }
           const last = index === parts.length - 1;
           return (
             <span key={href} className="contents">

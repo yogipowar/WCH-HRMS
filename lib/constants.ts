@@ -46,6 +46,7 @@ export const MANAGEMENT_NAV: AppNavItem[] = [
   { title: "Holidays", href: "/holidays", icon: "Palmtree", section: "Time" },
   { title: "Reports", href: "/reports", icon: "BarChart3", section: "Insights" },
   { title: "Payroll", href: "/payroll", icon: "Wallet", section: "Administration" },
+  { title: "Projects", href: "/projects", icon: "FolderKanban", section: "Administration" },
   { title: "Announcements", href: "/announcements", icon: "Megaphone", section: "Administration" },
   { title: "Documents", href: "/documents", icon: "FileText", section: "Administration" },
   { title: "Notifications", href: "/notifications", icon: "Bell", section: "Administration" },
@@ -54,9 +55,11 @@ export const MANAGEMENT_NAV: AppNavItem[] = [
 
 export const EMPLOYEE_NAV: AppNavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: "LayoutDashboard" },
+  { title: "Team", href: "/team", icon: "Users" },
   { title: "My Attendance", href: "/attendance", icon: "Clock3" },
   { title: "My Leaves", href: "/leave", icon: "CalendarDays" },
   { title: "Holidays", href: "/holidays", icon: "Palmtree" },
+  { title: "My Projects", href: "/projects", icon: "FolderKanban" },
   { title: "Announcements", href: "/announcements", icon: "Megaphone" },
   { title: "Documents", href: "/documents", icon: "FileText" },
   { title: "Salary slips", href: "/payroll", icon: "Wallet" },
@@ -65,11 +68,79 @@ export const EMPLOYEE_NAV: AppNavItem[] = [
 ];
 
 export const EMPLOYEE_MOBILE_TAB_NAV: AppNavItem[] = [
-  { title: "Dashboard", href: "/dashboard", icon: "LayoutDashboard" },
+  { title: "Home", href: "/dashboard", icon: "LayoutDashboard" },
   { title: "Attendance", href: "/attendance", icon: "Clock3" },
   { title: "Leaves", href: "/leave", icon: "CalendarDays" },
-  { title: "Documents", href: "/documents", icon: "FileText" },
+  { title: "Projects", href: "/projects", icon: "FolderKanban" },
 ];
+
+export const EMPLOYEE_MOBILE_MORE_SECTIONS: { title: string; items: AppNavItem[] }[] = [
+  {
+    title: "Workplace",
+    items: [
+      { title: "Team", href: "/team", icon: "Users" },
+      { title: "Holidays", href: "/holidays", icon: "Palmtree" },
+      { title: "Announcements", href: "/announcements", icon: "Megaphone" },
+    ],
+  },
+  {
+    title: "Records",
+    items: [
+      { title: "Documents", href: "/documents", icon: "FileText" },
+      { title: "Salary slips", href: "/payroll", icon: "Wallet" },
+    ],
+  },
+  {
+    title: "Account",
+    items: [
+      { title: "Notifications", href: "/notifications", icon: "Bell" },
+      { title: "My Profile", href: "/profile", icon: "UserRound" },
+    ],
+  },
+];
+
+export const EMPLOYEE_MOBILE_MORE_HREFS = EMPLOYEE_MOBILE_MORE_SECTIONS.flatMap((section) =>
+  section.items.map((item) => item.href),
+);
+
+export const MANAGEMENT_MOBILE_TAB_NAV: AppNavItem[] = [
+  { title: "Home", href: "/dashboard", icon: "LayoutDashboard" },
+  { title: "Attendance", href: "/attendance", icon: "Clock3" },
+  { title: "Leave", href: "/leave", icon: "CalendarDays" },
+  { title: "Projects", href: "/projects", icon: "FolderKanban" },
+];
+
+export const MANAGEMENT_MOBILE_MORE_SECTIONS: { title: string; items: AppNavItem[] }[] = [
+  {
+    title: "People",
+    items: [
+      { title: "Employees", href: "/employees", icon: "Users" },
+      { title: "Departments", href: "/departments", icon: "Building2" },
+      { title: "Designations", href: "/designations", icon: "Briefcase" },
+    ],
+  },
+  {
+    title: "Time & insights",
+    items: [
+      { title: "Holidays", href: "/holidays", icon: "Palmtree" },
+      { title: "Reports", href: "/reports", icon: "BarChart3" },
+    ],
+  },
+  {
+    title: "Administration",
+    items: [
+      { title: "Payroll", href: "/payroll", icon: "Wallet" },
+      { title: "Announcements", href: "/announcements", icon: "Megaphone" },
+      { title: "Documents", href: "/documents", icon: "FileText" },
+      { title: "Notifications", href: "/notifications", icon: "Bell" },
+      { title: "Settings", href: "/settings", icon: "Settings" },
+    ],
+  },
+];
+
+export const MANAGEMENT_MOBILE_MORE_HREFS = MANAGEMENT_MOBILE_MORE_SECTIONS.flatMap((section) =>
+  section.items.map((item) => item.href),
+);
 
 export const MANAGEMENT_ONLY_PREFIXES = [
   "/employees",

@@ -25,6 +25,20 @@ export function formatTime(value: string | Date | null, pattern = "hh:mm a"): st
   return format(date, pattern);
 }
 
+/** Formats a clock string like "09:30" for display (e.g. "09:30 AM"). */
+export function formatClockTime(value: string | null | undefined, pattern = "hh:mm a"): string {
+  if (!value) {
+    return "—";
+  }
+  const [hours, minutes] = value.split(":").map(Number);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    return value;
+  }
+  const date = new Date();
+  date.setHours(hours, minutes, 0, 0);
+  return format(date, pattern);
+}
+
 export function formatDateTime(value: string | Date, pattern = "dd MMM yyyy, hh:mm a"): string {
   const date = typeof value === "string" ? parseISO(value) : value;
   if (Number.isNaN(date.getTime())) {
@@ -94,6 +108,8 @@ export function attendanceStatusLabel(status: AttendanceStatus): string {
       return "Incomplete";
     case "COMPLETED":
       return "Completed";
+    case "HALF_DAY":
+      return "Half Day";
     case "WEEKLY_OFF":
       return "Weekly Off";
     case "HOLIDAY":

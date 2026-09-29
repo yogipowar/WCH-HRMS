@@ -1,5 +1,5 @@
 import type { AppData } from "@/data/mock-data";
-import type { EmployeeDocument, LeaveRequest, User } from "@/types";
+import type { AttendanceRecord, EmployeeDocument, LateRemovalRequest, LeaveRequest, Notification, User } from "@/types";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "");
 
@@ -84,11 +84,43 @@ export const api = {
   deleteHoliday(id: string) {
     return request(`/api/holidays/${id}`, { method: "DELETE" });
   },
+  createProject(body: unknown) {
+    return request("/api/projects", { method: "POST", body: JSON.stringify(body) });
+  },
+  updateProject(id: string, body: unknown) {
+    return request(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+  },
+  deleteProject(id: string) {
+    return request(`/api/projects/${id}`, { method: "DELETE" });
+  },
   createLeave(body: FormData) {
     return request<LeaveRequest>("/api/leave", { method: "POST", body });
   },
   updateLeaveStatus(id: string, body: unknown) {
     return request(`/api/leave/${id}/status`, { method: "PATCH", body: JSON.stringify(body) });
+  },
+  createLateRemoval(body: {
+    request: LateRemovalRequest;
+    notifications?: Notification[];
+  }) {
+    return request<{ request: LateRemovalRequest; notifications: Notification[] }>("/api/late-removal", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+  updateLateRemovalStatus(
+    id: string,
+    body: {
+      request: LateRemovalRequest;
+      attendance?: AttendanceRecord | null;
+      notifications?: Notification[];
+    },
+  ) {
+    return request<{
+      request: LateRemovalRequest;
+      attendance: AttendanceRecord | null;
+      notifications: Notification[];
+    }>(`/api/late-removal/${id}/status`, { method: "PATCH", body: JSON.stringify(body) });
   },
   saveAttendance(body: unknown) {
     return request("/api/attendance", { method: "PUT", body: JSON.stringify(body) });

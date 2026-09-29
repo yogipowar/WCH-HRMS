@@ -1,10 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { format, parseISO } from "date-fns";
+import type { DateRange } from "react-day-picker";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
 import { ActiveBadge, LiveStatusBadge } from "@/components/shared/status-badge";
 import { ConfirmationDialog } from "@/components/shared/confirmation-dialog";
+import { DateRangePicker } from "@/components/shared/date-range-picker";
 import { DataTable, type DataTableColumn } from "@/components/tables/data-table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LinkButton } from "@/components/shared/link-button";
@@ -16,19 +19,30 @@ import { useDataStore } from "@/lib/stores/data-store";
 import { currency, employmentTypeLabel, formatDate, initials } from "@/lib/utils/format";
 import type { Employee } from "@/types";
 
+function inJoiningRange(joiningDate: string, range: DateRange | undefined) {
+  if (!range?.from) return true;
+  const join = parseISO(joiningDate);
+  if (Number.isNaN(join.getTime())) return false;
+  const fromKey = format(range.from, "yyyy-MM-dd");
+  const toKey = format(range.to ?? range.from, "yyyy-MM-dd");
+  return joiningDate >= fromKey && joiningDate <= toKey;
+}
+
 export function EmployeesListPage() {
   const data = useDataStore();
   const [deactivateId, setDeactivateId] = useState<string | null>(null);
   const [departmentId, setDepartmentId] = useState("all");
   const [status, setStatus] = useState("all");
+  const [joiningRange, setJoiningRange] = useState<DateRange | undefined>();
 
   const employees = useMemo(() => {
     return data.employees.filter((item) => {
       if (departmentId !== "all" && item.departmentId !== departmentId) return false;
       if (status !== "all" && item.status !== status) return false;
+      if (!inJoiningRange(item.joiningDate, joiningRange)) return false;
       return true;
     });
-  }, [data.employees, departmentId, status]);
+  }, [data.employees, departmentId, joiningRange, status]);
 
   const columns = useMemo<DataTableColumn<Employee>[]>(
     () => [
@@ -93,7 +107,7 @@ export function EmployeesListPage() {
         description="Manage the Web Create Hub team from a single directory."
         actions={<LinkButton href="/employees/new">Add employee</LinkButton>}
       />
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <select className="h-10 rounded-lg border border-input bg-background px-3 text-sm" value={departmentId} onChange={(event) => setDepartmentId(event.target.value)}>
           <option value="all">All departments</option>
           {data.departments.map((item) => (
@@ -105,6 +119,12 @@ export function EmployeesListPage() {
           <option value="ACTIVE">Active</option>
           <option value="INACTIVE">Inactive</option>
         </select>
+        <DateRangePicker value={joiningRange} onChange={setJoiningRange} placeholder="Joining date range" />
+        {joiningRange?.from ? (
+          <Button type="button" variant="ghost" size="sm" onClick={() => setJoiningRange(undefined)}>
+            Clear dates
+          </Button>
+        ) : null}
       </div>
       <DataTable
         data={employees}

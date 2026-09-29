@@ -3,7 +3,7 @@ import type { RowDataPacket } from "mysql2";
 import { settings as defaultSettings } from "@/data/mock-data";
 import type { AppData } from "@/data/mock-data";
 import { createId } from "@/lib/lookups";
-import { ensureDocumentFileColumns, ensureLeaveAttachmentColumns, execute, query } from "@/lib/server/db";
+import { ensureDocumentFileColumns, ensureEmployeeScheduleColumns, ensureLateRemovalTable, ensureLeaveAttachmentColumns, ensureProjectsTable, execute, query } from "@/lib/server/db";
 import { clearTokenCookie, signToken, tokenCookie, tokenFromRequest, verifyToken } from "@/lib/server/auth";
 import type {
   Announcement,
@@ -15,11 +15,13 @@ import type {
   Employee,
   EmployeeDocument,
   Holiday,
+  LateRemovalRequest,
   LeaveBalance,
   LeaveRequest,
   LeaveType,
   Notification,
   PayrollRecord,
+  Project,
   User,
 } from "@/types";
 import { DOCUMENT_TYPES, LEAVE_TYPES } from "@/types";
@@ -111,6 +113,10 @@ function mapEmployee(row: RowDataPacket): Employee {
     workLocation: row.work_location,
     status: row.status,
     dailyRequiredHours: number(row.daily_required_hours),
+    workStartTime: String(row.work_start_time || defaultSettings.workStartTime),
+    lateAfterMinutes: Number.isFinite(Number(row.late_after_minutes))
+      ? number(row.late_after_minutes)
+      : defaultSettings.lateAfterMinutes,
     basicSalary: number(row.basic_salary),
     allowances: number(row.allowances),
     deductions: number(row.deductions),
@@ -162,6 +168,35 @@ function mapLeave(row: RowDataPacket): LeaveRequest {
   };
 }
 
+function mapLateRemoval(row: RowDataPacket): LateRemovalRequest {
+  return {
+    id: row.id,
+    employeeId: row.employee_id,
+    attendanceId: row.attendance_id,
+    attendanceDate: dateOnly(row.attendance_date),
+    lateMinutes: number(row.late_minutes),
+    activeWorkingMinutes: number(row.active_working_minutes),
+    requiredHours: number(row.required_hours),
+    reason: row.reason,
+    status: row.status,
+    rejectionReason: row.rejection_reason,
+    reviewedBy: row.reviewed_by,
+    reviewedAt: row.reviewed_at,
+    createdAt: row.created_at,
+  };
+}
+
+async function insertNotifications(items: Notification[]) {
+  for (const item of items) {
+    await execute(
+      `INSERT INTO notifications (id, user_id, type, title, message, is_read, created_at, href)
+       VALUES (?,?,?,?,?,?,?,?)
+       ON DUPLICATE KEY UPDATE title=VALUES(title), message=VALUES(message)`,
+      [item.id, item.userId, item.type, item.title, item.message, item.read ? 1 : 0, item.createdAt, item.href],
+    );
+  }
+}
+
 function mapHoliday(row: RowDataPacket): Holiday {
   return {
     id: row.id,
@@ -170,6 +205,24 @@ function mapHoliday(row: RowDataPacket): Holiday {
     type: row.type,
     description: row.description,
     recurring: bool(row.recurring),
+  };
+}
+
+function mapProject(row: RowDataPacket): Project {
+  return {
+    id: row.id,
+    serialNo: number(row.serial_no),
+    websiteName: String(row.website_name ?? ""),
+    websiteUrl: String(row.website_url ?? ""),
+    loginUsername: String(row.login_username ?? ""),
+    loginPassword: String(row.login_password ?? ""),
+    technologyUsed: String(row.technology_used ?? ""),
+    figmaLink: String(row.figma_link ?? ""),
+    remark: String(row.remark ?? ""),
+    projectManagerId: row.project_manager_id ? String(row.project_manager_id) : null,
+    teamMemberIds: parseJson<string[]>(row.team_member_ids, []),
+    createdAt: String(row.created_at ?? ""),
+    updatedAt: String(row.updated_at ?? ""),
   };
 }
 
@@ -232,6 +285,9 @@ function mapPayroll(row: RowDataPacket): PayrollRecord {
 export async function loadBootstrap(): Promise<AppData> {
   await ensureDocumentFileColumns();
   await ensureLeaveAttachmentColumns();
+  await ensureLateRemovalTable();
+  await ensureEmployeeScheduleColumns();
+  await ensureProjectsTable();
   const [
     users,
     employees,
@@ -240,11 +296,13 @@ export async function loadBootstrap(): Promise<AppData> {
     attendanceRecords,
     leaveBalances,
     leaveRequests,
+    lateRemovalRequests,
     holidays,
     notifications,
     announcements,
     documents,
     payrollRecords,
+    projects,
     settingsRows,
   ] = await Promise.all([
     query("SELECT * FROM users"),
@@ -259,6 +317,7 @@ export async function loadBootstrap(): Promise<AppData> {
               (attachment_data IS NOT NULL AND OCTET_LENGTH(attachment_data) > 0) AS has_attachment
        FROM leave_requests`,
     ),
+    query("SELECT * FROM late_removal_requests ORDER BY created_at DESC"),
     query("SELECT * FROM holidays"),
     query("SELECT * FROM notifications"),
     query("SELECT * FROM announcements"),
@@ -269,6 +328,7 @@ export async function loadBootstrap(): Promise<AppData> {
        ORDER BY uploaded_at DESC, id DESC`,
     ),
     query("SELECT * FROM payroll_records"),
+    query("SELECT * FROM projects ORDER BY serial_no ASC"),
     query("SELECT payload FROM settings WHERE id = 1"),
   ]);
 
@@ -297,11 +357,13 @@ export async function loadBootstrap(): Promise<AppData> {
       privilege: number(row.privilege),
     })),
     leaveRequests: leaveRequests.map(mapLeave),
+    lateRemovalRequests: lateRemovalRequests.map(mapLateRemoval),
     holidays: holidays.map(mapHoliday),
     notifications: notifications.map(mapNotification),
     announcements: announcements.map(mapAnnouncement),
     documents: documents.map(mapDocument),
     payrollRecords: payrollRecords.map(mapPayroll),
+    projects: projects.map(mapProject),
     settings: parseJson<CompanySettings>(settingsRows[0]?.payload, defaultSettings),
   };
 }
@@ -312,8 +374,9 @@ async function upsertEmployee(employee: Employee) {
       id, employee_code, user_id, full_name, avatar_url, date_of_birth, gender, phone,
       personal_email, work_email, address, department_id, designation_id, joining_date,
       employment_type, reporting_person_id, work_location, status, daily_required_hours,
+      work_start_time, late_after_minutes,
       basic_salary, allowances, deductions, emergency_contact, bank_information
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     ON DUPLICATE KEY UPDATE
       employee_code=VALUES(employee_code), user_id=VALUES(user_id), full_name=VALUES(full_name),
       avatar_url=VALUES(avatar_url), date_of_birth=VALUES(date_of_birth), gender=VALUES(gender),
@@ -322,6 +385,7 @@ async function upsertEmployee(employee: Employee) {
       joining_date=VALUES(joining_date), employment_type=VALUES(employment_type),
       reporting_person_id=VALUES(reporting_person_id), work_location=VALUES(work_location),
       status=VALUES(status), daily_required_hours=VALUES(daily_required_hours),
+      work_start_time=VALUES(work_start_time), late_after_minutes=VALUES(late_after_minutes),
       basic_salary=VALUES(basic_salary), allowances=VALUES(allowances), deductions=VALUES(deductions),
       emergency_contact=VALUES(emergency_contact), bank_information=VALUES(bank_information)`,
     [
@@ -344,6 +408,8 @@ async function upsertEmployee(employee: Employee) {
       employee.workLocation,
       employee.status,
       employee.dailyRequiredHours,
+      employee.workStartTime,
+      employee.lateAfterMinutes,
       employee.basicSalary,
       employee.allowances,
       employee.deductions,
@@ -865,6 +931,74 @@ export async function handleApiRequest(request: Request, parts: string[]) {
       return jsonResponse(200, { ok: true });
     }
 
+    if (parts[0] === "projects" && request.method === "POST") {
+      if (user.role !== "MANAGEMENT") {
+        return jsonResponse(403, { error: "Only administrators can create projects." });
+      }
+      await ensureProjectsTable();
+      const item = (await request.json()) as Project;
+      await execute(
+        `INSERT INTO projects (
+          id, serial_no, website_name, website_url, login_username, login_password,
+          technology_used, figma_link, remark, project_manager_id, team_member_ids, created_at, updated_at
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [
+          item.id,
+          item.serialNo,
+          item.websiteName,
+          item.websiteUrl,
+          item.loginUsername,
+          item.loginPassword,
+          item.technologyUsed,
+          item.figmaLink,
+          item.remark,
+          item.projectManagerId,
+          json(item.teamMemberIds ?? []),
+          item.createdAt,
+          item.updatedAt,
+        ],
+      );
+      return jsonResponse(200, item);
+    }
+
+    if (parts[0] === "projects" && parts[1] && request.method === "PATCH") {
+      if (user.role !== "MANAGEMENT") {
+        return jsonResponse(403, { error: "Only administrators can update projects." });
+      }
+      await ensureProjectsTable();
+      const item = (await request.json()) as Project;
+      await execute(
+        `UPDATE projects SET
+          serial_no=?, website_name=?, website_url=?, login_username=?, login_password=?,
+          technology_used=?, figma_link=?, remark=?, project_manager_id=?, team_member_ids=?, updated_at=?
+         WHERE id=?`,
+        [
+          item.serialNo,
+          item.websiteName,
+          item.websiteUrl,
+          item.loginUsername,
+          item.loginPassword,
+          item.technologyUsed,
+          item.figmaLink,
+          item.remark,
+          item.projectManagerId,
+          json(item.teamMemberIds ?? []),
+          item.updatedAt,
+          parts[1],
+        ],
+      );
+      return jsonResponse(200, { ok: true });
+    }
+
+    if (parts[0] === "projects" && parts[1] && request.method === "DELETE") {
+      if (user.role !== "MANAGEMENT") {
+        return jsonResponse(403, { error: "Only administrators can delete projects." });
+      }
+      await ensureProjectsTable();
+      await execute("DELETE FROM projects WHERE id = ?", [parts[1]]);
+      return jsonResponse(200, { ok: true });
+    }
+
     if (parts[0] === "leave" && parts[1] && parts[2] === "attachment" && request.method === "GET") {
       return serveLeaveAttachment(user, parts[1]);
     }
@@ -894,6 +1028,66 @@ export async function handleApiRequest(request: Request, parts: string[]) {
       const record = (await request.json()) as AttendanceRecord;
       await upsertAttendance(record);
       return jsonResponse(200, record);
+    }
+
+    if (parts[0] === "late-removal" && request.method === "POST") {
+      const body = (await request.json()) as {
+        request: LateRemovalRequest;
+        notifications?: Notification[];
+      };
+      const item = body.request;
+      await execute(
+        `INSERT INTO late_removal_requests (
+          id, employee_id, attendance_id, attendance_date, late_minutes, active_working_minutes,
+          required_hours, reason, status, rejection_reason, reviewed_by, reviewed_at, created_at
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [
+          item.id,
+          item.employeeId,
+          item.attendanceId,
+          item.attendanceDate,
+          item.lateMinutes,
+          item.activeWorkingMinutes,
+          item.requiredHours,
+          item.reason,
+          item.status,
+          item.rejectionReason,
+          item.reviewedBy,
+          item.reviewedAt,
+          item.createdAt,
+        ],
+      );
+      const notifications = body.notifications ?? [];
+      await insertNotifications(notifications);
+      return jsonResponse(200, { request: item, notifications });
+    }
+
+    if (parts[0] === "late-removal" && parts[1] && parts[2] === "status" && request.method === "PATCH") {
+      if (user.role !== "MANAGEMENT") {
+        return jsonResponse(403, { error: "Only administrators can review late removal requests." });
+      }
+      const body = (await request.json()) as {
+        request: LateRemovalRequest;
+        attendance?: AttendanceRecord | null;
+        notifications?: Notification[];
+      };
+      const item = body.request;
+      await execute(
+        `UPDATE late_removal_requests
+         SET status=?, reviewed_by=?, reviewed_at=?, rejection_reason=?
+         WHERE id=?`,
+        [item.status, item.reviewedBy, item.reviewedAt, item.rejectionReason, parts[1]],
+      );
+      if (body.attendance) {
+        await upsertAttendance(body.attendance);
+      }
+      const notifications = body.notifications ?? [];
+      await insertNotifications(notifications);
+      return jsonResponse(200, {
+        request: item,
+        attendance: body.attendance ?? null,
+        notifications,
+      });
     }
 
     if (parts[0] === "announcements" && request.method === "POST") {

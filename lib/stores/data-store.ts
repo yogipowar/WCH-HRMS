@@ -39,6 +39,8 @@ export const useDataStore = create<DataStore>()((set) => ({
       employees,
       attendanceRecords: (data.attendanceRecords ?? []).filter((record) => !isWeeklyOff(record.date, settings)),
       leaveBalances: [...leaveBalanceByEmployee.values()],
+      lateRemovalRequests: data.lateRemovalRequests ?? [],
+      projects: data.projects ?? [],
       ready: true,
     });
   },
@@ -56,11 +58,13 @@ export function getData(): AppData {
     attendanceRecords: state.attendanceRecords,
     leaveBalances: state.leaveBalances,
     leaveRequests: state.leaveRequests,
+    lateRemovalRequests: state.lateRemovalRequests ?? [],
     holidays: state.holidays,
     notifications: state.notifications,
     announcements: state.announcements,
     documents: state.documents,
     payrollRecords: state.payrollRecords,
+    projects: state.projects ?? [],
     settings: state.settings,
   };
 }

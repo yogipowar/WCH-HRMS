@@ -13,10 +13,12 @@ import type {
   Employee,
   EmployeeDocument,
   Holiday,
+  LateRemovalRequest,
   LeaveBalance,
   LeaveRequest,
   Notification,
   PayrollRecord,
+  Project,
   User,
 } from "@/types";
 import { REQUIRED_DAILY_HOURS } from "@/types";
@@ -32,11 +34,13 @@ export interface AppData {
   attendanceRecords: AttendanceRecord[];
   leaveBalances: LeaveBalance[];
   leaveRequests: LeaveRequest[];
+  lateRemovalRequests: LateRemovalRequest[];
   holidays: Holiday[];
   notifications: Notification[];
   announcements: Announcement[];
   documents: EmployeeDocument[];
   payrollRecords: PayrollRecord[];
+  projects: Project[];
   settings: CompanySettings;
 }
 
@@ -141,8 +145,15 @@ const seedUsers: Omit<User, "username" | "password">[] = [
 
 export const users: User[] = seedUsers.map(withLogin);
 
-function employee(partial: Employee): Employee {
-  return partial;
+function employee(
+  partial: Omit<Employee, "workStartTime" | "lateAfterMinutes"> &
+    Partial<Pick<Employee, "workStartTime" | "lateAfterMinutes">>,
+): Employee {
+  return {
+    workStartTime: settings.workStartTime,
+    lateAfterMinutes: settings.lateAfterMinutes,
+    ...partial,
+  };
 }
 
 export const employees: Employee[] = [
@@ -538,11 +549,13 @@ export function createSeedData(): AppData {
     attendanceRecords,
     leaveBalances,
     leaveRequests,
+    lateRemovalRequests: [],
     holidays,
     notifications,
     announcements,
     documents,
     payrollRecords,
+    projects: [],
     settings,
   };
 }

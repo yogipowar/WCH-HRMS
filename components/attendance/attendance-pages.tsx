@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { AttendanceHistoryList } from "@/components/attendance/attendance-history-list";
 import { EmployeeAttendanceBoard } from "@/components/attendance/employee-attendance-board";
 import { AttendanceTimeline } from "@/components/attendance/attendance-timeline";
+import { LateRemovalAdminPanel } from "@/components/attendance/late-removal-admin";
 import { LiveAttendanceTable } from "@/components/attendance/live-attendance-table";
 import { DatePicker } from "@/components/shared/date-range-picker";
 import { PageHeader } from "@/components/shared/page-header";
@@ -37,7 +38,7 @@ export function AttendanceHomePage() {
       <div className="space-y-4">
         <PageHeader
           title="My attendance"
-          description="Track clock-in, breaks, and the 9-hour active work target."
+          description="Track clock-in, breaks, and your daily active work target."
           actions={<LinkButton href="/attendance/history" variant="outline">History</LinkButton>}
         />
         <EmployeeAttendanceBoard
@@ -86,6 +87,7 @@ export function AttendanceHomePage() {
           </>
         }
       />
+      <LateRemovalAdminPanel />
     </div>
   );
 }
@@ -169,6 +171,7 @@ export function AttendanceHistoryPage() {
               <option value="all">All statuses</option>
               <option value="PRESENT">Present</option>
               <option value="LATE">Late</option>
+              <option value="HALF_DAY">Half day</option>
               <option value="COMPLETED">Completed</option>
               <option value="INCOMPLETE">Incomplete</option>
               <option value="ABSENT">Absent</option>

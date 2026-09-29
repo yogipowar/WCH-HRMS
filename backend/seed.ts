@@ -44,6 +44,7 @@ async function seed() {
     "notifications",
     "announcements",
     "documents",
+    "projects",
     "payroll_records",
     "settings",
   ]) {
@@ -74,8 +75,9 @@ async function seed() {
         id, employee_code, user_id, full_name, avatar_url, date_of_birth, gender, phone,
         personal_email, work_email, address, department_id, designation_id, joining_date,
         employment_type, reporting_person_id, work_location, status, daily_required_hours,
+        work_start_time, late_after_minutes,
         basic_salary, allowances, deductions, emergency_contact, bank_information
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         employee.id,
         employee.employeeCode,
@@ -96,6 +98,8 @@ async function seed() {
         employee.workLocation,
         employee.status,
         employee.dailyRequiredHours,
+        employee.workStartTime,
+        employee.lateAfterMinutes,
         employee.basicSalary,
         employee.allowances,
         employee.deductions,
