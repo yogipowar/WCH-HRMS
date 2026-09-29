@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -113,6 +113,25 @@ export function EmployeeForm({ employee }: { employee?: Employee }) {
     resolver: zodResolver(employeeFormSchema),
     defaultValues: toDefaults(employee, account?.username ?? "", settings),
   });
+  const selectedDepartmentId = form.watch("departmentId");
+  const selectedDesignationId = form.watch("designationId");
+  const departmentDesignations = useMemo(
+    () =>
+      designations.filter(
+        (item) =>
+          item.status === "ACTIVE" &&
+          (!selectedDepartmentId || item.departmentId === selectedDepartmentId),
+      ),
+    [designations, selectedDepartmentId],
+  );
+
+  useEffect(() => {
+    if (!selectedDesignationId) return;
+    const stillValid = departmentDesignations.some((item) => item.id === selectedDesignationId);
+    if (!stillValid) {
+      form.setValue("designationId", "", { shouldDirty: true, shouldValidate: true });
+    }
+  }, [departmentDesignations, form, selectedDesignationId]);
 
   async function onSubmit(values: EmployeeFormValues) {
     if (isUsernameTaken(values.username, employee?.userId)) {
@@ -230,17 +249,21 @@ export function EmployeeForm({ employee }: { employee?: Employee }) {
         <Field label="Department" error={form.formState.errors.departmentId?.message}>
           <NativeSelect {...form.register("departmentId")}>
             <option value="">Select department</option>
-            {departments.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
+            {departments
+              .filter((item) => item.status === "ACTIVE")
+              .map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
           </NativeSelect>
         </Field>
         <Field label="Designation" error={form.formState.errors.designationId?.message}>
-          <NativeSelect {...form.register("designationId")}>
-            <option value="">Select designation</option>
-            {designations.map((item) => (
+          <NativeSelect {...form.register("designationId")} disabled={!selectedDepartmentId}>
+            <option value="">
+              {selectedDepartmentId ? "Select designation" : "Select department first"}
+            </option>
+            {departmentDesignations.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name}
               </option>
@@ -297,6 +320,11 @@ export function EmployeeForm({ employee }: { employee?: Employee }) {
         <Field label="Username" error={form.formState.errors.username?.message}>
           <Input autoComplete="off" placeholder="e.g. neha.patel" {...form.register("username")} />
         </Field>
+        {employee && account?.password ? (
+          <Field label="Current password">
+            <Input value={account.password} readOnly />
+          </Field>
+        ) : null}
         <Field
           label={employee ? "New password" : "Password"}
           error={form.formState.errors.password?.message}

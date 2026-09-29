@@ -3,8 +3,9 @@ import type { RowDataPacket } from "mysql2";
 import { settings as defaultSettings } from "@/data/mock-data";
 import type { AppData } from "@/data/mock-data";
 import { createId } from "@/lib/lookups";
-import { ensureDocumentFileColumns, ensureEmployeeScheduleColumns, ensureLateRemovalTable, ensureLeaveAttachmentColumns, ensureProjectsTable, execute, query } from "@/lib/server/db";
+import { ensureDocumentFileColumns, ensureEmployeeScheduleColumns, ensureLateRemovalTable, ensureLeaveAttachmentColumns, ensurePasswordPlainColumn, ensureProjectsTable, execute, query } from "@/lib/server/db";
 import { clearTokenCookie, signToken, tokenCookie, tokenFromRequest, verifyToken } from "@/lib/server/auth";
+import { isGoogleSignInConfigured, verifyGoogleIdToken } from "@/lib/server/google-auth";
 import type {
   Announcement,
   AttendanceRecord,
@@ -78,7 +79,7 @@ function dateOnly(value: unknown, fallback = ""): string {
   return match?.[1] ?? fallback;
 }
 
-function publicUser(row: RowDataPacket): User {
+function publicUser(row: RowDataPacket, includePassword = false): User {
   return {
     id: row.id,
     name: row.name,
@@ -88,7 +89,7 @@ function publicUser(row: RowDataPacket): User {
     employeeId: row.employee_id,
     avatarUrl: row.avatar_url,
     username: row.username,
-    password: "",
+    password: includePassword ? String(row.password_plain ?? "") : "",
   };
 }
 
@@ -282,12 +283,13 @@ function mapPayroll(row: RowDataPacket): PayrollRecord {
   };
 }
 
-export async function loadBootstrap(): Promise<AppData> {
+export async function loadBootstrap(includePasswords = false): Promise<AppData> {
   await ensureDocumentFileColumns();
   await ensureLeaveAttachmentColumns();
   await ensureLateRemovalTable();
   await ensureEmployeeScheduleColumns();
   await ensureProjectsTable();
+  await ensurePasswordPlainColumn();
   const [
     users,
     employees,
@@ -333,7 +335,7 @@ export async function loadBootstrap(): Promise<AppData> {
   ]);
 
   return {
-    users: users.map(publicUser),
+    users: users.map((row) => publicUser(row, includePasswords)),
     employees: employees.map(mapEmployee),
     departments: departments.map((row) => ({
       id: row.id,
@@ -420,25 +422,27 @@ async function upsertEmployee(employee: Employee) {
 }
 
 async function upsertUser(user: User, password?: string) {
+  await ensurePasswordPlainColumn();
   const hash = password ? await bcrypt.hash(password, 10) : null;
+  const plain = password ?? user.password ?? "";
   if (hash) {
     await execute(
-      `INSERT INTO users (id, name, email, phone, role, employee_id, avatar_url, username, password_hash)
-       VALUES (?,?,?,?,?,?,?,?,?)
+      `INSERT INTO users (id, name, email, phone, role, employee_id, avatar_url, username, password_hash, password_plain)
+       VALUES (?,?,?,?,?,?,?,?,?,?)
        ON DUPLICATE KEY UPDATE name=VALUES(name), email=VALUES(email), phone=VALUES(phone),
          role=VALUES(role), employee_id=VALUES(employee_id), avatar_url=VALUES(avatar_url),
-         username=VALUES(username), password_hash=VALUES(password_hash)`,
-      [user.id, user.name, user.email, user.phone, user.role, user.employeeId, user.avatarUrl, user.username, hash],
+         username=VALUES(username), password_hash=VALUES(password_hash), password_plain=VALUES(password_plain)`,
+      [user.id, user.name, user.email, user.phone, user.role, user.employeeId, user.avatarUrl, user.username, hash, plain],
     );
     return;
   }
   await execute(
-    `INSERT INTO users (id, name, email, phone, role, employee_id, avatar_url, username, password_hash)
-     VALUES (?,?,?,?,?,?,?,?,?)
+    `INSERT INTO users (id, name, email, phone, role, employee_id, avatar_url, username, password_hash, password_plain)
+     VALUES (?,?,?,?,?,?,?,?,?,?)
      ON DUPLICATE KEY UPDATE name=VALUES(name), email=VALUES(email), phone=VALUES(phone),
        role=VALUES(role), employee_id=VALUES(employee_id), avatar_url=VALUES(avatar_url),
        username=VALUES(username)`,
-    [user.id, user.name, user.email, user.phone, user.role, user.employeeId, user.avatarUrl, user.username, ""],
+    [user.id, user.name, user.email, user.phone, user.role, user.employeeId, user.avatarUrl, user.username, "", ""],
   );
 }
 
@@ -797,11 +801,73 @@ export async function handleApiRequest(request: Request, parts: string[]) {
           return jsonResponse(401, { error: "The username or password is incorrect." });
         }
       }
+      await ensurePasswordPlainColumn();
+      if (!String(account.password_plain ?? "") && password) {
+        await execute("UPDATE users SET password_plain = ? WHERE id = ?", [password, account.id]);
+        account.password_plain = password;
+      }
       const user = publicUser(account);
       const remember = Boolean(body.remember);
       const token = signToken(user, remember);
       const maxAge = remember ? 60 * 60 * 24 * 30 : 60 * 60 * 12;
       return jsonResponse(200, { user, token }, { "Set-Cookie": tokenCookie(token, maxAge) });
+    }
+
+    if (parts[0] === "auth" && parts[1] === "google" && request.method === "POST") {
+      if (!isGoogleSignInConfigured()) {
+        return jsonResponse(503, { error: "Google Sign-In is not configured on this server." });
+      }
+      const body = (await request.json().catch(() => ({}))) as Json;
+      const credential = String(body.credential || "").trim();
+      if (!credential) {
+        return jsonResponse(400, { error: "Missing Google credential." });
+      }
+      let googleEmail = "";
+      try {
+        const googleUser = await verifyGoogleIdToken(credential);
+        googleEmail = googleUser.email;
+      } catch (error) {
+        return jsonResponse(401, {
+          error: error instanceof Error ? error.message : "Google Sign-In failed.",
+        });
+      }
+      const byUserEmail = await query("SELECT * FROM users WHERE LOWER(email) = ?", [googleEmail]);
+      let account = byUserEmail[0];
+      if (!account) {
+        const byEmployeeEmail = await query(
+          `SELECT u.* FROM users u
+           INNER JOIN employees e ON (e.user_id = u.id OR e.id = u.employee_id)
+           WHERE LOWER(e.work_email) = ? OR LOWER(e.personal_email) = ?
+           LIMIT 1`,
+          [googleEmail, googleEmail],
+        );
+        account = byEmployeeEmail[0];
+      }
+      if (!account) {
+        return jsonResponse(403, {
+          error: "No HRMS account matches this Google email. Ask admin to add your work email first.",
+        });
+      }
+      if (account.employee_id) {
+        const employees = await query("SELECT status FROM employees WHERE id = ?", [account.employee_id]);
+        if (employees[0]?.status === "INACTIVE") {
+          return jsonResponse(403, { error: "This employee account is inactive." });
+        }
+      }
+      const user = publicUser(account);
+      const remember = body.remember !== false;
+      const token = signToken(user, remember);
+      const maxAge = remember ? 60 * 60 * 24 * 30 : 60 * 60 * 12;
+      return jsonResponse(200, { user, token }, { "Set-Cookie": tokenCookie(token, maxAge) });
+    }
+
+    if (parts[0] === "auth" && parts[1] === "google-config" && request.method === "GET") {
+      const clientId =
+        process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim() || process.env.GOOGLE_CLIENT_ID?.trim() || "";
+      return jsonResponse(200, {
+        enabled: Boolean(clientId),
+        clientId,
+      });
     }
 
     if (parts[0] === "auth" && parts[1] === "logout" && request.method === "POST") {
@@ -818,7 +884,7 @@ export async function handleApiRequest(request: Request, parts: string[]) {
     }
 
     if (parts[0] === "bootstrap" && request.method === "GET") {
-      const data = await loadBootstrap();
+      const data = await loadBootstrap(user.role === "MANAGEMENT");
       if (user.role !== "MANAGEMENT") {
         data.payrollRecords = data.payrollRecords.filter(
           (item) => item.employeeId === user.employeeId && isPayslipReleased(item),

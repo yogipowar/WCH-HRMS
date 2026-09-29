@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
   avatar_url TEXT NULL,
   username VARCHAR(128) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
+  password_plain VARCHAR(255) NOT NULL DEFAULT '',
   UNIQUE KEY users_username (username),
   UNIQUE KEY users_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -53,8 +53,8 @@ async function seed() {
 
   for (const user of data.users) {
     await connection.query(
-      `INSERT INTO users (id, name, email, phone, role, employee_id, avatar_url, username, password_hash)
-       VALUES (?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO users (id, name, email, phone, role, employee_id, avatar_url, username, password_hash, password_plain)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
       [
         user.id,
         user.name,
@@ -65,6 +65,7 @@ async function seed() {
         user.avatarUrl,
         user.username,
         await bcrypt.hash(user.password, 10),
+        user.password,
       ],
     );
   }

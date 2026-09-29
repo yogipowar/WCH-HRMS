@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, LockKeyhole, ShieldCheck, UserRound } from "lucide-react";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { BrandLogo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -17,9 +18,11 @@ import { loginFormSchema, type LoginFormValues } from "@/lib/validations/login";
 export function LoginPage() {
   const router = useRouter();
   const login = useAuthStore((state) => state.login);
+  const loginWithGoogle = useAuthStore((state) => state.loginWithGoogle);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
+  const [googleBusy, setGoogleBusy] = useState(false);
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: { username: "", password: "" },
@@ -30,6 +33,18 @@ export function LoginPage() {
     const success = await login(values.username, values.password, rememberMe);
     if (!success) {
       setFormError("The username or password is incorrect.");
+      return;
+    }
+    router.replace("/dashboard");
+  }
+
+  async function onGoogleCredential(credential: string) {
+    setFormError(null);
+    setGoogleBusy(true);
+    const result = await loginWithGoogle(credential, rememberMe);
+    setGoogleBusy(false);
+    if (!result.ok) {
+      setFormError(result.error || "Google Sign-In failed.");
       return;
     }
     router.replace("/dashboard");
@@ -166,11 +181,19 @@ export function LoginPage() {
                 <Button
                   type="submit"
                   className="h-11 w-full rounded-md"
-                  disabled={form.formState.isSubmitting}
+                  disabled={form.formState.isSubmitting || googleBusy}
                 >
                   Sign in
                 </Button>
               </form>
+
+              <div className="mt-5">
+                <GoogleSignInButton
+                  rememberMe={rememberMe}
+                  onSuccess={onGoogleCredential}
+                  onError={(message) => setFormError(message)}
+                />
+              </div>
             </div>
 
             <p className="mt-6 text-center text-xs leading-5 text-slate-500">

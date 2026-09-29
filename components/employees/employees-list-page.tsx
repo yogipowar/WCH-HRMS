@@ -68,6 +68,26 @@ export function EmployeesListPage() {
       { id: "department", header: "Department", sortable: true, accessor: (row) => getDepartmentName(data, row.departmentId), cell: (row) => getDepartmentName(data, row.departmentId) },
       { id: "designation", header: "Designation", accessor: (row) => getDesignationName(data, row.designationId), cell: (row) => getDesignationName(data, row.designationId) },
       { id: "joining", header: "Joining date", accessor: (row) => row.joiningDate, cell: (row) => formatDate(row.joiningDate) },
+      {
+        id: "login",
+        header: "Login",
+        accessor: (row) => data.users.find((user) => user.id === row.userId)?.username ?? "",
+        cell: (row) => {
+          const account = data.users.find((user) => user.id === row.userId);
+          if (!account) return "—";
+          return (
+            <div className="space-y-0.5 text-xs">
+              <p>
+                <span className="text-muted-foreground">User:</span> {account.username || "—"}
+              </p>
+              <p className="font-mono">
+                <span className="text-muted-foreground">Pass:</span>{" "}
+                {account.password || "—"}
+              </p>
+            </div>
+          );
+        },
+      },
       { id: "salary", header: "Salary", sortable: true, accessor: (row) => row.basicSalary + row.allowances, cell: (row) => currency(row.basicSalary + row.allowances) },
       { id: "type", header: "Type", accessor: (row) => row.employmentType, cell: (row) => employmentTypeLabel(row.employmentType) },
       { id: "status", header: "Status", cell: (row) => <ActiveBadge active={row.status === "ACTIVE"} /> },

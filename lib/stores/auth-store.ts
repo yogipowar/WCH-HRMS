@@ -10,6 +10,7 @@ interface AuthStore {
   isAuthenticated: boolean;
   status: "idle" | "loading" | "ready";
   login: (username: string, password: string, remember?: boolean) => Promise<boolean>;
+  loginWithGoogle: (credential: string, remember?: boolean) => Promise<{ ok: boolean; error?: string }>;
   logout: () => Promise<void>;
   restore: () => Promise<void>;
 }
@@ -34,6 +35,26 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
       useDataStore.setState({ ready: true });
     }
     return true;
+  },
+  loginWithGoogle: async (credential, remember = true) => {
+    try {
+      const { user, token } = await api.loginWithGoogle(credential, remember);
+      setApiToken(token);
+      set({ user, isAuthenticated: true, status: "ready" });
+    } catch (error) {
+      set({ user: null, isAuthenticated: false, status: "ready" });
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : "Google Sign-In failed.",
+      };
+    }
+    try {
+      await useDataStore.getState().hydrateFromApi();
+    } catch (error) {
+      console.error("Failed to load workspace data after Google login.", error);
+      useDataStore.setState({ ready: true });
+    }
+    return { ok: true };
   },
   logout: async () => {
     try {

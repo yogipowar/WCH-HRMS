@@ -48,6 +48,15 @@ export const api = {
       body: JSON.stringify({ username, password, remember }),
     });
   },
+  loginWithGoogle(credential: string, remember = true) {
+    return request<{ user: User; token: string }>("/api/auth/google", {
+      method: "POST",
+      body: JSON.stringify({ credential, remember }),
+    });
+  },
+  googleConfig() {
+    return request<{ enabled: boolean; clientId: string }>("/api/auth/google-config");
+  },
   logout() {
     return request<{ ok: boolean }>("/api/auth/logout", { method: "POST" });
   },

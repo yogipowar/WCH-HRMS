@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
 import { EmployeeForm } from "@/components/employees/employee-form";
 import { AttendanceHistoryList } from "@/components/attendance/attendance-history-list";
 import { AttendanceTimeline } from "@/components/attendance/attendance-timeline";
@@ -10,7 +11,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { ActiveBadge, LeaveStatusBadge, LiveStatusBadge } from "@/components/shared/status-badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LinkButton } from "@/components/shared/link-button";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDuration, summarizeAttendance } from "@/lib/attendance/calculations";
@@ -21,14 +22,18 @@ import { documentService } from "@/lib/services/documentService";
 import { PayslipActions } from "@/components/payroll/payslip-actions";
 import { PayrollStatusControl } from "@/components/payroll/payroll-status-control";
 import { payrollService } from "@/lib/services/payrollService";
+import { useAuthStore } from "@/lib/stores/auth-store";
 import { useDataStore } from "@/lib/stores/data-store";
 import { currency, documentTypeLabel, employmentTypeLabel, formatDate, formatPeriod, formatTime, initials, leaveTypeLabel, todayIsoDate } from "@/lib/utils/format";
 
 export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   const data = useDataStore();
+  const authUser = useAuthStore((state) => state.user);
   const searchParams = useSearchParams();
   const employee = data.employees.find((item) => item.id === employeeId);
   const account = data.users.find((item) => item.id === employee?.userId);
+  const isAdmin = authUser?.role === "MANAGEMENT";
+  const [showPassword, setShowPassword] = useState(false);
   const today = attendanceFor(data, employeeId);
   const history = [...data.attendanceRecords]
     .filter((item) => item.employeeId === employeeId)
@@ -102,7 +107,36 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
           <InfoCard title="Reporting person" value={getReportingPersonName(data, employee.reportingPersonId)} />
           <InfoCard title="Basic salary" value={currency(employee.basicSalary)} />
           <InfoCard title="Gross salary" value={currency(employee.basicSalary + employee.allowances)} />
-          <InfoCard title="Username" value={account?.username || "Not set"} />
+          {isAdmin ? (
+            <>
+              <InfoCard title="Username" value={account?.username || "Not set"} />
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground">Password</p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <p className="font-mono text-sm font-semibold">
+                      {account?.password
+                        ? showPassword
+                          ? account.password
+                          : "••••••••"
+                        : "Not stored — set a password when editing"}
+                    </p>
+                    {account?.password ? (
+                      <Button
+                        type="button"
+                        size="icon-sm"
+                        variant="ghost"
+                        onClick={() => setShowPassword((value) => !value)}
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </Button>
+                    ) : null}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : null}
         </TabsContent>
         <TabsContent value="personal">
           <Card>
