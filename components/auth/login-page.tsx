@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, LockKeyhole, ShieldCheck, UserRound } from "lucide-react";
-import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
+import { GoogleSignInButton, isNativeAndroidApp } from "@/components/auth/google-sign-in-button";
 import { BrandLogo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -23,10 +23,35 @@ export function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [googleBusy, setGoogleBusy] = useState(false);
+  const [appVersionLabel, setAppVersionLabel] = useState<string | null>(null);
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: { username: "", password: "" },
   });
+
+  useEffect(() => {
+    const readVersion = () => {
+      try {
+        if (typeof window.WchHrmsApp?.getVersionName === "function") {
+          const name = window.WchHrmsApp.getVersionName() || "";
+          const code =
+            typeof window.WchHrmsApp.getVersionCode === "function"
+              ? window.WchHrmsApp.getVersionCode()
+              : "";
+          setAppVersionLabel(code ? `App v${name} (${code})` : `App v${name}`);
+          return;
+        }
+        if (isNativeAndroidApp()) {
+          setAppVersionLabel("WCH HRMS App");
+        }
+      } catch {
+        // ignore
+      }
+    };
+    readVersion();
+    const timer = window.setTimeout(readVersion, 400);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   async function onSubmit(values: LoginFormValues) {
     setFormError(null);
@@ -104,102 +129,108 @@ export function LoginPage() {
           </span>
         </div>
 
-        <div className="flex flex-1 items-center justify-center px-5 py-10 sm:px-8">
-          <div className="w-full max-w-[420px]">
-            <div className="rounded-xl border bg-card p-7 sm:p-8">
-              <p className="hidden text-[11px] font-semibold tracking-[0.18em] text-primary uppercase lg:block">
-                {COMPANY_NAME}
-              </p>
-              <h2 className="text-2xl font-semibold tracking-tight text-foreground lg:mt-2">
-                Sign in
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Enter your credentials to access the HRMS workspace.
-              </p>
-
-              <form className="mt-7 space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
-                <div className="space-y-2">
-                  <Label htmlFor="username">Username</Label>
-                  <div className="relative">
-                    <UserRound className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-                    <Input
-                      id="username"
-                      autoComplete="username"
-                      className="h-11 rounded-md border-slate-200 bg-white pl-10"
-                      placeholder="Username or work email"
-                      {...form.register("username")}
-                    />
-                  </div>
-                  {form.formState.errors.username ? (
-                    <p className="text-xs text-destructive">{form.formState.errors.username.message}</p>
-                  ) : null}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <div className="relative">
-                    <LockKeyhole className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="current-password"
-                      className="h-11 rounded-md border-slate-200 bg-white pr-11 pl-10"
-                      placeholder="Password"
-                      {...form.register("password")}
-                    />
-                    <button
-                      type="button"
-                      className="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                      onClick={() => setShowPassword((value) => !value)}
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                    >
-                      {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                    </button>
-                  </div>
-                  {form.formState.errors.password ? (
-                    <p className="text-xs text-destructive">{form.formState.errors.password.message}</p>
-                  ) : null}
-                </div>
-
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <label className="flex items-center gap-2 text-sm text-slate-600">
-                    <Checkbox
-                      checked={rememberMe}
-                      onCheckedChange={(value) => setRememberMe(value === true)}
-                    />
-                    Remember me
-                  </label>
-                  <span className="text-xs text-slate-400">Forgot password? Contact admin</span>
-                </div>
-
-                {formError ? (
-                  <p className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                    {formError}
-                  </p>
-                ) : null}
-
-                <Button
-                  type="submit"
-                  className="h-11 w-full rounded-md"
-                  disabled={form.formState.isSubmitting || googleBusy}
-                >
+        <div className="flex flex-1 flex-col">
+          <div className="flex flex-1 items-center justify-center px-5 py-10 sm:px-8">
+            <div className="w-full max-w-[420px]">
+              <div className="rounded-xl border bg-card p-7 sm:p-8">
+                <p className="hidden text-[11px] font-semibold tracking-[0.18em] text-primary uppercase lg:block">
+                  {COMPANY_NAME}
+                </p>
+                <h2 className="text-2xl font-semibold tracking-tight text-foreground lg:mt-2">
                   Sign in
-                </Button>
-              </form>
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  Enter your credentials to access the HRMS workspace.
+                </p>
 
-              <div className="mt-5">
-                <GoogleSignInButton
-                  rememberMe={rememberMe}
-                  onSuccess={onGoogleCredential}
-                  onError={(message) => setFormError(message)}
-                />
+                <form className="mt-7 space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
+                  <div className="space-y-2">
+                    <Label htmlFor="username">Username</Label>
+                    <div className="relative">
+                      <UserRound className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+                      <Input
+                        id="username"
+                        autoComplete="username"
+                        className="h-11 rounded-md border-slate-200 bg-white pl-10"
+                        placeholder="Username or work email"
+                        {...form.register("username")}
+                      />
+                    </div>
+                    {form.formState.errors.username ? (
+                      <p className="text-xs text-destructive">{form.formState.errors.username.message}</p>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <div className="relative">
+                      <LockKeyhole className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="current-password"
+                        className="h-11 rounded-md border-slate-200 bg-white pr-11 pl-10"
+                        placeholder="Password"
+                        {...form.register("password")}
+                      />
+                      <button
+                        type="button"
+                        className="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                        onClick={() => setShowPassword((value) => !value)}
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </div>
+                    {form.formState.errors.password ? (
+                      <p className="text-xs text-destructive">{form.formState.errors.password.message}</p>
+                    ) : null}
+                  </div>
+
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <label className="flex items-center gap-2 text-sm text-slate-600">
+                      <Checkbox
+                        checked={rememberMe}
+                        onCheckedChange={(value) => setRememberMe(value === true)}
+                      />
+                      Remember me
+                    </label>
+                    <span className="text-xs text-slate-400">Forgot password? Contact admin</span>
+                  </div>
+
+                  {formError ? (
+                    <p className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                      {formError}
+                    </p>
+                  ) : null}
+
+                  <Button
+                    type="submit"
+                    className="h-11 w-full rounded-md"
+                    disabled={form.formState.isSubmitting || googleBusy}
+                  >
+                    Sign in
+                  </Button>
+                </form>
+
+                <div className="mt-5">
+                  <GoogleSignInButton
+                    rememberMe={rememberMe}
+                    onSuccess={onGoogleCredential}
+                    onError={(message) => setFormError(message)}
+                  />
+                </div>
               </div>
-            </div>
 
-            <p className="mt-6 text-center text-xs leading-5 text-slate-500">
-              Authorized personnel only. If you cannot sign in, contact administration.
-            </p>
+              <p className="mt-6 text-center text-xs leading-5 text-slate-500">
+                Authorized personnel only. If you cannot sign in, contact administration.
+              </p>
+            </div>
           </div>
+
+          {appVersionLabel ? (
+            <p className="pb-5 text-center text-[11px] text-muted-foreground">{appVersionLabel}</p>
+          ) : null}
         </div>
       </section>
     </div>

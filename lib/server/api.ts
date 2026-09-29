@@ -6,6 +6,7 @@ import { createId } from "@/lib/lookups";
 import { ensureDocumentFileColumns, ensureEmployeeScheduleColumns, ensureLateRemovalTable, ensureLeaveAttachmentColumns, ensurePasswordPlainColumn, ensureProjectsTable, execute, query } from "@/lib/server/db";
 import { clearTokenCookie, signToken, tokenCookie, tokenFromRequest, verifyToken } from "@/lib/server/auth";
 import { isGoogleSignInConfigured, verifyGoogleIdToken } from "@/lib/server/google-auth";
+import { createGoogleHandoff, takeGoogleHandoff } from "@/lib/server/google-handoff";
 import type {
   Announcement,
   AttendanceRecord,
@@ -868,6 +869,34 @@ export async function handleApiRequest(request: Request, parts: string[]) {
         enabled: Boolean(clientId),
         clientId,
       });
+    }
+
+    if (parts[0] === "auth" && parts[1] === "google-handoff" && request.method === "POST") {
+      const body = (await request.json().catch(() => ({}))) as Json;
+      const credential = String(body.credential || "").trim();
+      if (!credential) {
+        return jsonResponse(400, { error: "Missing Google credential." });
+      }
+      try {
+        await verifyGoogleIdToken(credential);
+      } catch {
+        return jsonResponse(401, { error: "Invalid Google credential." });
+      }
+      const handoffId = createGoogleHandoff(credential);
+      return jsonResponse(200, { handoffId });
+    }
+
+    if (parts[0] === "auth" && parts[1] === "google-handoff" && request.method === "GET") {
+      const url = new URL(request.url);
+      const handoffId = String(url.searchParams.get("id") || "").trim();
+      if (!handoffId) {
+        return jsonResponse(400, { error: "Missing handoff id." });
+      }
+      const credential = takeGoogleHandoff(handoffId);
+      if (!credential) {
+        return jsonResponse(404, { error: "Handoff expired or not found. Try Google Sign-In again." });
+      }
+      return jsonResponse(200, { credential });
     }
 
     if (parts[0] === "auth" && parts[1] === "logout" && request.method === "POST") {

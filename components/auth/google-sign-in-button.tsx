@@ -2,33 +2,59 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api/client";
+import { Button } from "@/components/ui/button";
 
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        id: {
-          initialize: (config: {
-            client_id: string;
-            callback: (response: { credential: string }) => void;
-            auto_select?: boolean;
-            cancel_on_tap_outside?: boolean;
-          }) => void;
-          renderButton: (
-            parent: HTMLElement,
-            options: {
-              theme?: "outline" | "filled_blue" | "filled_black";
-              size?: "large" | "medium" | "small";
-              text?: "signin_with" | "continue_with" | "signup_with";
-              shape?: "rectangular" | "pill" | "circle" | "square";
-              width?: number;
-              logo_alignment?: "left" | "center";
-            },
-          ) => void;
-        };
-      };
-    };
+function markNativeApp() {
+  try {
+    sessionStorage.setItem("wch_native_app", "1");
+  } catch {
+    // ignore
   }
+}
+
+export function isNativeAndroidApp() {
+  if (typeof window === "undefined") return false;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("native") === "1") {
+      markNativeApp();
+      return true;
+    }
+  } catch {
+    // ignore
+  }
+  try {
+    if (window.WchHrmsApp?.isNativeApp?.()) {
+      markNativeApp();
+      return true;
+    }
+  } catch {
+    // ignore
+  }
+  try {
+    return sessionStorage.getItem("wch_native_app") === "1";
+  } catch {
+    return false;
+  }
+}
+
+function startRedirectGoogleSignIn(clientId: string) {
+  // APK must use the same GIS flow as the website (JavaScript origin).
+  // Opening Google's /o/oauth2/v2/auth causes redirect_uri_mismatch unless that
+  // URI is registered — GIS on /auth/google/app-start avoids that entirely.
+  void clientId;
+  markNativeApp();
+  const startUrl = `${window.location.origin}/auth/google/app-start`;
+
+  try {
+    if (typeof window.WchHrmsApp?.startGoogleOAuth === "function") {
+      window.WchHrmsApp.startGoogleOAuth(startUrl);
+      return;
+    }
+  } catch {
+    // fall through
+  }
+  window.location.assign(startUrl);
 }
 
 export function GoogleSignInButton({
@@ -42,19 +68,23 @@ export function GoogleSignInButton({
 }) {
   const buttonRef = useRef<HTMLDivElement>(null);
   const [enabled, setEnabled] = useState(false);
+  const [clientId, setClientId] = useState("");
   const [ready, setReady] = useState(false);
-  const rememberRef = useRef(rememberMe);
+  const [nativeApp, setNativeApp] = useState(false);
   const onSuccessRef = useRef(onSuccess);
   const onErrorRef = useRef(onError);
-
-  useEffect(() => {
-    rememberRef.current = rememberMe;
-  }, [rememberMe]);
 
   useEffect(() => {
     onSuccessRef.current = onSuccess;
     onErrorRef.current = onError;
   }, [onError, onSuccess]);
+
+  useEffect(() => {
+    const detect = () => setNativeApp(isNativeAndroidApp());
+    detect();
+    const timer = window.setTimeout(detect, 300);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,6 +97,13 @@ export function GoogleSignInButton({
           return;
         }
         setEnabled(true);
+        setClientId(config.clientId);
+
+        if (isNativeAndroidApp()) {
+          setReady(true);
+          return;
+        }
+
         const existing = document.querySelector<HTMLScriptElement>("script[data-google-gsi]");
         const init = () => {
           if (!buttonRef.current || !window.google?.accounts?.id) return;
@@ -111,6 +148,11 @@ export function GoogleSignInButton({
     };
   }, []);
 
+  useEffect(() => {
+    if (!enabled) return;
+    sessionStorage.setItem("wch_google_oauth_remember", rememberMe ? "1" : "0");
+  }, [enabled, rememberMe]);
+
   if (!enabled) return null;
 
   return (
@@ -123,8 +165,28 @@ export function GoogleSignInButton({
           <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
         </div>
       </div>
-      <div ref={buttonRef} className="flex min-h-11 w-full justify-center" />
-      {!ready ? <p className="text-center text-xs text-muted-foreground">Loading Google…</p> : null}
+
+      {nativeApp ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="h-11 w-full rounded-md"
+          onClick={() => {
+            if (!clientId) {
+              onError("Google Sign-In is not configured.");
+              return;
+            }
+            startRedirectGoogleSignIn(clientId);
+          }}
+        >
+          Sign in with Google
+        </Button>
+      ) : (
+        <>
+          <div ref={buttonRef} className="flex min-h-11 w-full justify-center" />
+          {!ready ? <p className="text-center text-xs text-muted-foreground">Loading Google…</p> : null}
+        </>
+      )}
     </div>
   );
 }
