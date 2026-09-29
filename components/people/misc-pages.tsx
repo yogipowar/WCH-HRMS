@@ -752,7 +752,7 @@ export function ProfilePage() {
                     employee.gender === "MALE"
                       ? "Male (Mr.)"
                       : employee.gender === "FEMALE"
-                        ? "Female (Mrs.)"
+                        ? "Female (Ms.)"
                         : employee.gender
                   }
                   readOnly

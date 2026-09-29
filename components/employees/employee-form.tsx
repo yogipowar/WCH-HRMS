@@ -226,7 +226,7 @@ export function EmployeeForm({ employee }: { employee?: Employee }) {
             gender={watchedGender}
             value={avatarUrl}
             onChange={setAvatarUrl}
-            hint="Upload a photo or pick an avatar. Male → Mr., Female → Mrs. If empty, the default silhouette is used."
+            hint="Upload a photo or pick an avatar. Male → Mr., Female → Ms. If empty, the default silhouette is used."
           />
           <p className="mt-2 text-xs text-muted-foreground">
             Display name preview:{" "}
@@ -236,7 +236,7 @@ export function EmployeeForm({ employee }: { employee?: Employee }) {
           </p>
         </div>
         <Field label="Full name" error={form.formState.errors.fullName?.message}>
-          <Input {...form.register("fullName")} placeholder="Without Mr. / Mrs. prefix" />
+          <Input {...form.register("fullName")} placeholder="Without Mr. / Ms. prefix" />
         </Field>
         <Field label="Date of birth" error={form.formState.errors.dateOfBirth?.message}>
           <Input type="date" {...form.register("dateOfBirth")} />
@@ -244,7 +244,7 @@ export function EmployeeForm({ employee }: { employee?: Employee }) {
         <Field label="Gender" error={form.formState.errors.gender?.message}>
           <NativeSelect {...form.register("gender")}>
             <option value="MALE">Male (Mr.)</option>
-            <option value="FEMALE">Female (Mrs.)</option>
+            <option value="FEMALE">Female (Ms.)</option>
             <option value="OTHER">Other</option>
             <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
           </NativeSelect>

@@ -2,7 +2,7 @@ import type { Employee, Gender } from "@/types";
 
 export function employeeSalutation(gender: Gender | null | undefined): string {
   if (gender === "MALE") return "Mr.";
-  if (gender === "FEMALE") return "Mrs.";
+  if (gender === "FEMALE") return "Ms.";
   return "";
 }
 
