@@ -9,14 +9,15 @@ import { ActiveBadge, LiveStatusBadge } from "@/components/shared/status-badge";
 import { ConfirmationDialog } from "@/components/shared/confirmation-dialog";
 import { DateRangePicker } from "@/components/shared/date-range-picker";
 import { DataTable, type DataTableColumn } from "@/components/tables/data-table";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import { LinkButton } from "@/components/shared/link-button";
 import { Button } from "@/components/ui/button";
 import { employeeService } from "@/lib/services/employeeService";
+import { formatEmployeeDisplayName } from "@/lib/employee/display";
 import { getDepartmentName, getDesignationName, toLiveStatus } from "@/lib/lookups";
 import { attendanceService } from "@/lib/services/attendanceService";
 import { useDataStore } from "@/lib/stores/data-store";
-import { currency, employmentTypeLabel, formatDate, initials } from "@/lib/utils/format";
+import { currency, employmentTypeLabel, formatDate } from "@/lib/utils/format";
 import type { Employee } from "@/types";
 
 function inJoiningRange(joiningDate: string, range: DateRange | undefined) {
@@ -51,14 +52,12 @@ export function EmployeesListPage() {
         id: "name",
         header: "Name",
         sortable: true,
-        accessor: (row) => row.fullName,
+        accessor: (row) => formatEmployeeDisplayName(row.fullName, row.gender),
         cell: (row) => (
           <div className="flex items-center gap-2">
-            <Avatar className="size-8">
-              <AvatarFallback>{initials(row.fullName)}</AvatarFallback>
-            </Avatar>
+            <EmployeeAvatar employee={row} className="size-8" />
             <div>
-              <p className="font-medium">{row.fullName}</p>
+              <p className="font-medium">{formatEmployeeDisplayName(row.fullName, row.gender)}</p>
               <p className="text-xs text-muted-foreground">{row.workEmail}</p>
             </div>
           </div>

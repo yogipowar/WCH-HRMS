@@ -2,12 +2,13 @@
 
 import { PageHeader } from "@/components/shared/page-header";
 import { ActiveBadge } from "@/components/shared/status-badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import { LinkButton } from "@/components/shared/link-button";
 import { Card, CardContent } from "@/components/ui/card";
+import { formatEmployeeDisplayName } from "@/lib/employee/display";
 import { getDepartmentName, getDesignationName, getReportingPersonName } from "@/lib/lookups";
 import { useDataStore } from "@/lib/stores/data-store";
-import { employmentTypeLabel, formatDate, initials } from "@/lib/utils/format";
+import { employmentTypeLabel, formatDate } from "@/lib/utils/format";
 
 export function TeamMemberPage({ employeeId }: { employeeId: string }) {
   const data = useDataStore();
@@ -17,10 +18,12 @@ export function TeamMemberPage({ employeeId }: { employeeId: string }) {
     return <p className="text-sm text-muted-foreground">Team member not found.</p>;
   }
 
+  const displayName = formatEmployeeDisplayName(employee.fullName, employee.gender);
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title={employee.fullName}
+        title={displayName}
         description={`${employee.employeeCode} · ${getDesignationName(data, employee.designationId)}`}
         actions={
           <LinkButton href="/team" variant="outline">
@@ -32,11 +35,9 @@ export function TeamMemberPage({ employeeId }: { employeeId: string }) {
       <Card className="shadow-sm">
         <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
-            <Avatar className="size-16">
-              <AvatarFallback className="text-lg">{initials(employee.fullName)}</AvatarFallback>
-            </Avatar>
+            <EmployeeAvatar employee={employee} className="size-16" fallbackClassName="text-lg" />
             <div>
-              <p className="text-lg font-semibold">{employee.fullName}</p>
+              <p className="text-lg font-semibold">{displayName}</p>
               <p className="text-sm text-muted-foreground">
                 {getDepartmentName(data, employee.departmentId)} · {employmentTypeLabel(employee.employmentType)}
               </p>

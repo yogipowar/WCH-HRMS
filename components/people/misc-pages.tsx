@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
+import { ProfilePhotoField } from "@/components/shared/profile-photo-field";
 import { AnnouncementStatusBadge } from "@/components/shared/status-badge";
 import { DataTable, type DataTableColumn } from "@/components/tables/data-table";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -18,9 +19,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { BrandLogo } from "@/components/brand/logo";
 import { announcementService, isAnnouncementVisibleTo } from "@/lib/services/announcementService";
 import { documentService } from "@/lib/services/documentService";
+import { employeeService } from "@/lib/services/employeeService";
 import { notificationService } from "@/lib/services/notificationService";
 import { payrollService } from "@/lib/services/payrollService";
 import { settingsService } from "@/lib/services/settingsService";
+import { formatEmployeeDisplayName } from "@/lib/employee/display";
 import { getEmployeeByUser, getEmployeeName } from "@/lib/lookups";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { useDataStore } from "@/lib/stores/data-store";
@@ -489,7 +492,9 @@ export function DocumentsPage() {
                 <Label>Employee</Label>
                 <NativeSelect className={formFieldControlClass} value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} required>
                   {data.employees.map((item) => (
-                    <option key={item.id} value={item.id}>{item.fullName}</option>
+                    <option key={item.id} value={item.id}>
+                      {formatEmployeeDisplayName(item.fullName, item.gender)}
+                    </option>
                   ))}
                 </NativeSelect>
               </div>
@@ -668,28 +673,98 @@ export function ProfilePage() {
   const employee = user ? getEmployeeByUser(data, user.id) : undefined;
   const [name, setName] = useState(user?.name ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(employee?.avatarUrl ?? null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setAvatarUrl(employee?.avatarUrl ?? null);
+  }, [employee?.avatarUrl]);
 
   if (!user) return null;
 
+  const displayName = employee
+    ? formatEmployeeDisplayName(employee.fullName, employee.gender)
+    : name;
+
+  async function saveProfile() {
+    setSaving(true);
+    try {
+      if (employee) {
+        employeeService.updateEmployee(employee.id, { avatarUrl });
+        toast.success("Profile photo saved.");
+      } else {
+        toast.success("Profile updated in this session.");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save profile.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
-      <PageHeader title="My profile" description="Account information for the current demo user." />
+      <PageHeader title="My profile" description="Your account details and profile photo." />
       <Card>
         <CardContent className={`${formGridClass} p-5`}>
-          <div className={formWideClass}><BrandLogo className="max-h-10" /></div>
-          <Field label="Name"><Input value={name} onChange={(event) => setName(event.target.value)} /></Field>
-          <Field label="Email"><Input value={user.email} readOnly /></Field>
-          <Field label="Phone"><Input value={phone} onChange={(event) => setPhone(event.target.value)} /></Field>
-          <Field label="Role"><Input value={user.role === "MANAGEMENT" ? "Management / Admin" : "Employee"} readOnly /></Field>
+          <div className={formWideClass}>
+            <BrandLogo className="max-h-10" />
+          </div>
+          {employee ? (
+            <div className={formWideClass}>
+              <Label className="mb-2 block">Profile photo</Label>
+              <ProfilePhotoField
+                fullName={employee.fullName}
+                gender={employee.gender}
+                value={avatarUrl}
+                onChange={setAvatarUrl}
+                hint="Upload your photo or choose an avatar. Empty uses the default silhouette."
+              />
+            </div>
+          ) : null}
+          <Field label="Name">
+            <Input
+              value={employee ? displayName : name}
+              onChange={(event) => setName(event.target.value)}
+              readOnly={Boolean(employee)}
+            />
+          </Field>
+          <Field label="Email">
+            <Input value={user.email} readOnly />
+          </Field>
+          <Field label="Phone">
+            <Input value={phone} onChange={(event) => setPhone(event.target.value)} readOnly={Boolean(employee)} />
+          </Field>
+          <Field label="Role">
+            <Input value={user.role === "MANAGEMENT" ? "Management / Admin" : "Employee"} readOnly />
+          </Field>
           {employee ? (
             <>
-              <Field label="Employee ID"><Input value={employee.employeeCode} readOnly /></Field>
-              <Field label="Joining date"><Input value={employee.joiningDate} readOnly /></Field>
+              <Field label="Employee ID">
+                <Input value={employee.employeeCode} readOnly />
+              </Field>
+              <Field label="Joining date">
+                <Input value={employee.joiningDate} readOnly />
+              </Field>
+              <Field label="Gender">
+                <Input
+                  value={
+                    employee.gender === "MALE"
+                      ? "Male (Mr.)"
+                      : employee.gender === "FEMALE"
+                        ? "Female (Mrs.)"
+                        : employee.gender
+                  }
+                  readOnly
+                />
+              </Field>
             </>
           ) : null}
         </CardContent>
       </Card>
-      <Button onClick={() => toast.success("Profile updated in this demo session.")}>Save profile</Button>
+      <Button disabled={saving} onClick={() => void saveProfile()}>
+        {saving ? "Saving…" : "Save profile"}
+      </Button>
     </div>
   );
 }

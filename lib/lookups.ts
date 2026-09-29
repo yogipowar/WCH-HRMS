@@ -1,4 +1,5 @@
 import type { AppData } from "@/data/mock-data";
+import { formatEmployeeDisplayName } from "@/lib/employee/display";
 import type {
   AttendanceState,
   AttendanceStatus,
@@ -15,7 +16,9 @@ export function getDesignationName(data: AppData, designationId: string): string
 }
 
 export function getEmployeeName(data: AppData, employeeId: string): string {
-  return data.employees.find((item) => item.id === employeeId)?.fullName ?? "Unknown employee";
+  const employee = data.employees.find((item) => item.id === employeeId);
+  if (!employee) return "Unknown employee";
+  return formatEmployeeDisplayName(employee.fullName, employee.gender);
 }
 
 export function getEmployeeByUser(data: AppData, userId: string): Employee | undefined {

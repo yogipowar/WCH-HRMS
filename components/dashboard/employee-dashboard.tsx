@@ -7,11 +7,12 @@ import { CalendarDays, FileText, Mail, MapPin, Phone } from "lucide-react";
 import { AttendanceActionBar, AttendanceControlCard } from "@/components/attendance/attendance-control-card";
 import { ChartCard } from "@/components/charts/chart-card";
 import { DashboardGreeting } from "@/components/dashboard/dashboard-greeting";
+import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import { LeaveStatusBadge } from "@/components/shared/status-badge";
 import { LinkButton } from "@/components/shared/link-button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { YEARLY_PAID_LEAVE_TOTAL, YEARLY_PAID_LEAVES, remainingPaidDays } from "@/lib/leave/policy";
+import { formatEmployeeDisplayName } from "@/lib/employee/display";
 import { getDepartmentName, getDesignationName } from "@/lib/lookups";
 import { isPayslipReleased } from "@/lib/payroll/record";
 import { employeeDailyHours, employeeWeeklyHours } from "@/lib/reports/aggregations";
@@ -23,7 +24,6 @@ import {
   formatDate,
   formatPeriod,
   formatTime,
-  initials,
   leaveTypeLabel,
 } from "@/lib/utils/format";
 import type { Employee } from "@/types";
@@ -67,7 +67,7 @@ export function EmployeeDashboard({ employee }: { employee: Employee }) {
   return (
     <div className="space-y-5">
       <DashboardGreeting
-        name={employee.fullName}
+        name={formatEmployeeDisplayName(employee.fullName, employee.gender)}
         subtitle={`${getDesignationName(data, employee.designationId)} · ${getDepartmentName(data, employee.departmentId)}`}
         actions={<AttendanceActionBar employeeId={employee.id} />}
       />
@@ -76,12 +76,11 @@ export function EmployeeDashboard({ employee }: { employee: Employee }) {
         <Card>
           <CardContent className="flex flex-col gap-5 p-6">
             <div className="flex items-start gap-4">
-              <Avatar className="size-20 shrink-0">
-                {employee.avatarUrl ? <AvatarImage src={employee.avatarUrl} alt={employee.fullName} /> : null}
-                <AvatarFallback className="text-lg">{initials(employee.fullName)}</AvatarFallback>
-              </Avatar>
+              <EmployeeAvatar employee={employee} className="size-20 shrink-0" fallbackClassName="text-lg" />
               <div className="min-w-0">
-                <p className="truncate text-lg font-semibold">{employee.fullName}</p>
+                <p className="truncate text-lg font-semibold">
+                  {formatEmployeeDisplayName(employee.fullName, employee.gender)}
+                </p>
                 <p className="text-sm text-muted-foreground">
                   {getDesignationName(data, employee.designationId)}
                 </p>

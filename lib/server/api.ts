@@ -923,6 +923,9 @@ export async function handleApiRequest(request: Request, parts: string[]) {
     }
 
     if (parts[0] === "employees" && request.method === "POST") {
+      if (user.role !== "MANAGEMENT") {
+        return jsonResponse(403, { error: "Only administrators can add employees." });
+      }
       const body = (await request.json()) as {
         employee: Employee;
         user: User;
@@ -948,6 +951,27 @@ export async function handleApiRequest(request: Request, parts: string[]) {
         user?: User;
         payrollRecord?: PayrollRecord;
       };
+      if (user.role !== "MANAGEMENT") {
+        if (!user.employeeId || parts[1] !== user.employeeId || !body.employee) {
+          return jsonResponse(403, { error: "You can only update your own profile photo." });
+        }
+        const existingRows = await query("SELECT * FROM employees WHERE id = ?", [user.employeeId]);
+        const existing = existingRows[0] ? mapEmployee(existingRows[0]) : null;
+        if (!existing) {
+          return jsonResponse(404, { error: "Employee not found." });
+        }
+        const nextEmployee: Employee = {
+          ...existing,
+          avatarUrl: body.employee.avatarUrl ?? null,
+        };
+        await upsertEmployee(nextEmployee);
+        const linkedUserRows = await query("SELECT * FROM users WHERE employee_id = ?", [user.employeeId]);
+        if (linkedUserRows[0]) {
+          const linked = publicUser(linkedUserRows[0], false);
+          await upsertUser({ ...linked, avatarUrl: nextEmployee.avatarUrl });
+        }
+        return jsonResponse(200, { ok: true });
+      }
       if (body.employee) await upsertEmployee(body.employee);
       if (body.user) await upsertUser(body.user, body.user.password || undefined);
       if (body.payrollRecord) await upsertPayroll(body.payrollRecord);

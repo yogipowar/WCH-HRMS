@@ -9,13 +9,14 @@ import { AttendanceHistoryList } from "@/components/attendance/attendance-histor
 import { AttendanceTimeline } from "@/components/attendance/attendance-timeline";
 import { PageHeader } from "@/components/shared/page-header";
 import { ActiveBadge, LeaveStatusBadge, LiveStatusBadge } from "@/components/shared/status-badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import { LinkButton } from "@/components/shared/link-button";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDuration, summarizeAttendance } from "@/lib/attendance/calculations";
 import { findOpenAttendance } from "@/lib/attendance/session";
+import { formatEmployeeDisplayName } from "@/lib/employee/display";
 import { getDepartmentName, getDesignationName, getReportingPersonName, toLiveStatus } from "@/lib/lookups";
 import { remainingPaidDays, YEARLY_PAID_LEAVE_TOTAL, YEARLY_PAID_LEAVES } from "@/lib/leave/policy";
 import { documentService } from "@/lib/services/documentService";
@@ -24,7 +25,7 @@ import { PayrollStatusControl } from "@/components/payroll/payroll-status-contro
 import { payrollService } from "@/lib/services/payrollService";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { useDataStore } from "@/lib/stores/data-store";
-import { currency, documentTypeLabel, employmentTypeLabel, formatDate, formatPeriod, formatTime, initials, leaveTypeLabel, todayIsoDate } from "@/lib/utils/format";
+import { currency, documentTypeLabel, employmentTypeLabel, formatDate, formatPeriod, formatTime, leaveTypeLabel, todayIsoDate } from "@/lib/utils/format";
 
 export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   const data = useDataStore();
@@ -52,10 +53,12 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
     return <p className="text-sm text-muted-foreground">Employee not found.</p>;
   }
 
+  const displayName = formatEmployeeDisplayName(employee.fullName, employee.gender);
+
   if (searchParams.get("edit") === "1") {
     return (
       <div className="space-y-6">
-        <PageHeader title={`Edit ${employee.fullName}`} description="Update employee records." />
+        <PageHeader title={`Edit ${displayName}`} description="Update employee records." />
         <EmployeeForm employee={employee} />
       </div>
     );
@@ -64,18 +67,16 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={employee.fullName}
+        title={displayName}
         description={`${employee.employeeCode} · ${getDesignationName(data, employee.designationId)}`}
         actions={<LinkButton href={`/employees/${employee.id}?edit=1`}>Edit</LinkButton>}
       />
       <Card className="shadow-sm">
         <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
-            <Avatar className="size-16">
-              <AvatarFallback className="text-lg">{initials(employee.fullName)}</AvatarFallback>
-            </Avatar>
+            <EmployeeAvatar employee={employee} className="size-16" fallbackClassName="text-lg" />
             <div>
-              <p className="text-lg font-semibold">{employee.fullName}</p>
+              <p className="text-lg font-semibold">{displayName}</p>
               <p className="text-sm text-muted-foreground">
                 {getDepartmentName(data, employee.departmentId)} · {employmentTypeLabel(employee.employmentType)}
               </p>

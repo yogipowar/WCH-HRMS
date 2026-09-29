@@ -10,7 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
+import { ProfilePhotoField } from "@/components/shared/profile-photo-field";
 import { isUsernameTaken } from "@/lib/auth/credentials";
+import { formatEmployeeDisplayName } from "@/lib/employee/display";
 import { formGridClass, formWideClass } from "@/lib/ui/form-styles";
 import { createId } from "@/lib/lookups";
 import { employeeService } from "@/lib/services/employeeService";
@@ -108,6 +110,7 @@ export function EmployeeForm({ employee }: { employee?: Employee }) {
   const users = useDataStore((state) => state.users);
   const settings = useDataStore((state) => state.settings);
   const [showPassword, setShowPassword] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(employee?.avatarUrl ?? null);
   const account = users.find((item) => item.id === employee?.userId);
   const form = useForm<EmployeeFormValues>({
     resolver: zodResolver(employeeFormSchema),
@@ -115,6 +118,8 @@ export function EmployeeForm({ employee }: { employee?: Employee }) {
   });
   const selectedDepartmentId = form.watch("departmentId");
   const selectedDesignationId = form.watch("designationId");
+  const watchedName = form.watch("fullName");
+  const watchedGender = form.watch("gender");
   const departmentDesignations = useMemo(
     () =>
       designations.filter(
@@ -156,7 +161,7 @@ export function EmployeeForm({ employee }: { employee?: Employee }) {
       employeeCode: values.employeeCode,
       userId: employee?.userId ?? createId("user"),
       fullName: values.fullName,
-      avatarUrl: employee?.avatarUrl ?? null,
+      avatarUrl,
       dateOfBirth: values.dateOfBirth,
       gender: values.gender,
       phone: values.phone,
@@ -214,16 +219,32 @@ export function EmployeeForm({ employee }: { employee?: Employee }) {
   return (
     <form className="space-y-8" onSubmit={form.handleSubmit(onSubmit)}>
       <Section title="Personal">
+        <div className={formWideClass}>
+          <Label className="mb-2 block">Profile photo</Label>
+          <ProfilePhotoField
+            fullName={watchedName || "Employee"}
+            gender={watchedGender}
+            value={avatarUrl}
+            onChange={setAvatarUrl}
+            hint="Upload a photo or pick an avatar. Male → Mr., Female → Mrs. If empty, the default silhouette is used."
+          />
+          <p className="mt-2 text-xs text-muted-foreground">
+            Display name preview:{" "}
+            <span className="font-medium text-foreground">
+              {formatEmployeeDisplayName(watchedName || "Full name", watchedGender)}
+            </span>
+          </p>
+        </div>
         <Field label="Full name" error={form.formState.errors.fullName?.message}>
-          <Input {...form.register("fullName")} />
+          <Input {...form.register("fullName")} placeholder="Without Mr. / Mrs. prefix" />
         </Field>
         <Field label="Date of birth" error={form.formState.errors.dateOfBirth?.message}>
           <Input type="date" {...form.register("dateOfBirth")} />
         </Field>
         <Field label="Gender" error={form.formState.errors.gender?.message}>
           <NativeSelect {...form.register("gender")}>
-            <option value="MALE">Male</option>
-            <option value="FEMALE">Female</option>
+            <option value="MALE">Male (Mr.)</option>
+            <option value="FEMALE">Female (Mrs.)</option>
             <option value="OTHER">Other</option>
             <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
           </NativeSelect>
@@ -288,7 +309,7 @@ export function EmployeeForm({ employee }: { employee?: Employee }) {
               .filter((item) => item.id !== employee?.id)
               .map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.fullName}
+                  {formatEmployeeDisplayName(item.fullName, item.gender)}
                 </option>
               ))}
           </NativeSelect>
