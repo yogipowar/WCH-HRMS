@@ -18,7 +18,11 @@ import { isOpenAttendance } from "@/lib/attendance/session";
 import { toLiveStatus } from "@/lib/lookups";
 import { useDataStore } from "@/lib/stores/data-store";
 import { formatClockTime, formatDate, formatTime } from "@/lib/utils/format";
-import type { AttendanceRecord } from "@/types";
+import {
+  LATE_MARKS_BEFORE_HALF_DAY,
+  LATE_REMOVAL_MONTHLY_LIMIT,
+  type AttendanceRecord,
+} from "@/types";
 
 export function EmployeeAttendanceBoard({
   employeeId,
@@ -31,8 +35,17 @@ export function EmployeeAttendanceBoard({
   const { now, record, summary, offReason } = session;
   const employee = useDataStore((state) => state.employees.find((item) => item.id === employeeId));
   const settings = useDataStore((state) => state.settings);
+  const lateRemovalRequests = useDataStore((state) => state.lateRemovalRequests ?? []);
   const workStartTime = employee?.workStartTime || settings.workStartTime;
   const lateAfterMinutes = employee?.lateAfterMinutes ?? settings.lateAfterMinutes;
+
+  const lateRequestRecords = recentRecords.filter((item) => {
+    if (item.id === record.id) return false;
+    if (item.lateMinutes > 0) return true;
+    return lateRemovalRequests.some(
+      (req) => req.attendanceId === item.id && req.status !== "CANCELLED",
+    );
+  });
 
   return (
     <div className="space-y-4">
@@ -102,6 +115,31 @@ export function EmployeeAttendanceBoard({
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Late removal policy</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-1 pt-0 text-sm text-muted-foreground">
+          <p>
+            If you clock in late but complete your required hours ({record.requiredHours}h), you can ask
+            admin to remove that late mark (up to {LATE_REMOVAL_MONTHLY_LIMIT} times per month).
+          </p>
+          <p>
+            After {LATE_MARKS_BEFORE_HALF_DAY} countable late marks in a month, each further late day is
+            marked half day. Admin-approved removals do not count toward that limit.
+          </p>
+        </CardContent>
+      </Card>
+
+      {lateRequestRecords.length > 0 ? (
+        <div className="space-y-3">
+          <p className="text-sm font-medium">Late days — request removal</p>
+          {lateRequestRecords.map((item) => (
+            <LateRemovalRequestPanel key={item.id} record={item} showDate />
+          ))}
+        </div>
+      ) : null}
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3 pb-2">

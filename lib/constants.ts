@@ -55,11 +55,11 @@ export const MANAGEMENT_NAV: AppNavItem[] = [
 
 export const EMPLOYEE_NAV: AppNavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: "LayoutDashboard" },
-  { title: "Team", href: "/team", icon: "Users" },
   { title: "My Attendance", href: "/attendance", icon: "Clock3" },
   { title: "My Leaves", href: "/leave", icon: "CalendarDays" },
   { title: "Holidays", href: "/holidays", icon: "Palmtree" },
   { title: "My Projects", href: "/projects", icon: "FolderKanban" },
+  { title: "Team", href: "/team", icon: "Users" },
   { title: "Announcements", href: "/announcements", icon: "Megaphone" },
   { title: "Documents", href: "/documents", icon: "FileText" },
   { title: "Salary slips", href: "/payroll", icon: "Wallet" },

@@ -21,7 +21,13 @@ import {
   type AttendanceRecord,
 } from "@/types";
 
-export function LateRemovalRequestPanel({ record }: { record: AttendanceRecord }) {
+export function LateRemovalRequestPanel({
+  record,
+  showDate = false,
+}: {
+  record: AttendanceRecord;
+  showDate?: boolean;
+}) {
   const lateRemovalRequests = useDataStore((state) => state.lateRemovalRequests ?? []);
   const attendanceRecords = useDataStore((state) => state.attendanceRecords);
   const [open, setOpen] = useState(false);
@@ -65,12 +71,18 @@ export function LateRemovalRequestPanel({ record }: { record: AttendanceRecord }
     <div className="rounded-xl border bg-card p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
-          <p className="text-sm font-semibold">Late mark</p>
+          <p className="text-sm font-semibold">
+            Late mark{showDate ? ` · ${formatDate(record.date)}` : ""}
+          </p>
           <p className="text-xs text-muted-foreground">
-            Late by {formatDuration(record.lateMinutes)}. Countable lates this month: {countableLates}
+            Late by {formatDuration(record.lateMinutes)}. Active work{" "}
+            {formatDuration(record.activeWorkingMinutes)} / {record.requiredHours}h required.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Countable lates this month: {countableLates}
             {countableLates >= LATE_MARKS_BEFORE_HALF_DAY
-              ? ` (half day applies after ${LATE_MARKS_BEFORE_HALF_DAY} lates).`
-              : ` (${LATE_MARKS_BEFORE_HALF_DAY - countableLates} before half-day rule).`}
+              ? ` (further lates are half day after ${LATE_MARKS_BEFORE_HALF_DAY} countable marks).`
+              : ` (${LATE_MARKS_BEFORE_HALF_DAY - countableLates} more before half-day rule).`}
           </p>
           <p className="text-xs text-muted-foreground">
             Late removal requests left this month: {remaining}/{LATE_REMOVAL_MONTHLY_LIMIT}
@@ -113,7 +125,8 @@ export function LateRemovalRequestPanel({ record }: { record: AttendanceRecord }
           <div className="space-y-3">
             <p>
               Ask admin to remove the late mark for {formatDate(record.date)} and set status to present.
-              This uses 1 of your {LATE_REMOVAL_MONTHLY_LIMIT} monthly requests.
+              This uses 1 of your {LATE_REMOVAL_MONTHLY_LIMIT} monthly requests. Approved removals do not
+              count toward the {LATE_MARKS_BEFORE_HALF_DAY} late → half-day rule.
             </p>
             <Textarea
               value={reason}

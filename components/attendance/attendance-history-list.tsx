@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { AttendanceTimeline } from "@/components/attendance/attendance-timeline";
+import { LateRemovalRequestPanel } from "@/components/attendance/late-removal-panel";
 import { AttendanceStatusBadge } from "@/components/shared/status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDuration, summarizeAttendance } from "@/lib/attendance/calculations";
@@ -84,8 +85,9 @@ export function AttendanceHistoryList({
               <ChevronDown className={cn("mt-1 size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
             </button>
             {open ? (
-              <CardContent className="border-t pt-4">
+              <CardContent className="space-y-4 border-t pt-4">
                 <AttendanceTimeline record={record} />
+                {!showEmployee ? <LateRemovalRequestPanel record={record} showDate /> : null}
               </CardContent>
             ) : null}
           </Card>
