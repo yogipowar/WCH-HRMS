@@ -55,6 +55,7 @@ export function TeamMemberPage({ employeeId }: { employeeId: string }) {
         <InfoCard title="Designation" value={getDesignationName(data, employee.designationId)} />
         <InfoCard title="Department" value={getDepartmentName(data, employee.departmentId)} />
         <InfoCard title="Employment type" value={employmentTypeLabel(employee.employmentType)} />
+        <InfoCard title="Date of birth" value={formatDate(employee.dateOfBirth)} />
         <InfoCard title="Joining date" value={formatDate(employee.joiningDate)} />
         <InfoCard title="Work location" value={employee.workLocation} />
         <InfoCard title="Reporting person" value={getReportingPersonName(data, employee.reportingPersonId)} />

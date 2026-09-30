@@ -3,6 +3,8 @@ import type { UserRole } from "@/types";
 export const APP_NAME = "HRMS";
 export const COMPANY_NAME = "Web Create Hub";
 export const COMPANY_TAGLINE = "Digital Solutions Agency";
+export const DEVELOPED_BY = "Scrollosoft";
+export const DEVELOPED_BY_URL = "https://www.scrollosoft.com/";
 export const APP_SUBTITLE = "Employee & Workforce Management";
 
 export const AGENCY = {

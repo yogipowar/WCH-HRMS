@@ -90,6 +90,7 @@ export async function getPool(): Promise<Pool> {
     await ensureEmployeeScheduleColumns(pool);
     await ensureProjectsTable(pool);
     await ensurePasswordPlainColumn(pool);
+    await ensureUserPreferenceColumns(pool);
     schemaReady = true;
   }
   return pool;
@@ -228,6 +229,25 @@ export async function ensurePasswordPlainColumn(db?: Pool) {
     await pool.query("ALTER TABLE users ADD COLUMN password_plain VARCHAR(255) NOT NULL DEFAULT ''");
   }
   passwordPlainColumnReady = true;
+}
+
+let userPreferenceColumnsReady = false;
+
+export async function ensureUserPreferenceColumns(db?: Pool) {
+  if (userPreferenceColumnsReady) return;
+  const pool = db ?? (await getPool());
+  const [columns] = await pool.query<RowDataPacket[]>(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`,
+  );
+  const names = new Set(columns.map((row) => String(row.COLUMN_NAME)));
+  if (!names.has("color_theme")) {
+    await pool.query("ALTER TABLE users ADD COLUMN color_theme VARCHAR(32) NOT NULL DEFAULT 'atlantic'");
+  }
+  if (!names.has("appearance")) {
+    await pool.query("ALTER TABLE users ADD COLUMN appearance VARCHAR(16) NOT NULL DEFAULT 'light'");
+  }
+  userPreferenceColumnsReady = true;
 }
 
 export async function query<T extends RowDataPacket>(sql: string, params: unknown[] = []) {

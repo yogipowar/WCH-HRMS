@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS users (
   username VARCHAR(128) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   password_plain VARCHAR(255) NOT NULL DEFAULT '',
+  color_theme VARCHAR(32) NOT NULL DEFAULT 'atlantic',
+  appearance VARCHAR(16) NOT NULL DEFAULT 'light',
   UNIQUE KEY users_username (username),
   UNIQUE KEY users_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

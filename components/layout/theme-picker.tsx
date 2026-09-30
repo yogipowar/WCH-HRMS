@@ -11,8 +11,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAuthStore } from "@/lib/stores/auth-store";
 import { useColorThemeStore } from "@/lib/stores/color-theme-store";
-import { COLOR_THEMES } from "@/lib/theme/color-themes";
+import { COLOR_THEMES, type ColorThemeId } from "@/lib/theme/color-themes";
 import { cn } from "@/lib/utils";
 
 const APPEARANCE = [
@@ -25,6 +26,17 @@ export function AppearanceThemePanel({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme();
   const colorTheme = useColorThemeStore((state) => state.colorTheme);
   const setColorTheme = useColorThemeStore((state) => state.setColorTheme);
+  const savePreferences = useAuthStore((state) => state.savePreferences);
+
+  function chooseMode(mode: "light" | "dark" | "system") {
+    setTheme(mode);
+    void savePreferences({ appearance: mode });
+  }
+
+  function chooseColor(id: ColorThemeId) {
+    setColorTheme(id);
+    void savePreferences({ colorTheme: id });
+  }
 
   return (
     <div className={cn("space-y-5", className)}>
@@ -38,7 +50,7 @@ export function AppearanceThemePanel({ className }: { className?: string }) {
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setTheme(item.id)}
+                onClick={() => chooseMode(item.id)}
                 className={cn(
                   "flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm",
                   active ? "border-primary bg-accent text-foreground" : "border-border text-muted-foreground hover:bg-muted",
@@ -60,7 +72,7 @@ export function AppearanceThemePanel({ className }: { className?: string }) {
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setColorTheme(item.id)}
+                onClick={() => chooseColor(item.id)}
                 className={cn(
                   "flex items-start gap-3 rounded-lg border px-3 py-3 text-left",
                   active ? "border-primary bg-accent text-foreground" : "border-border text-muted-foreground hover:bg-muted",
@@ -89,6 +101,17 @@ export function ThemePicker() {
   const { theme, setTheme } = useTheme();
   const colorTheme = useColorThemeStore((state) => state.colorTheme);
   const setColorTheme = useColorThemeStore((state) => state.setColorTheme);
+  const savePreferences = useAuthStore((state) => state.savePreferences);
+
+  function chooseMode(mode: "light" | "dark" | "system") {
+    setTheme(mode);
+    void savePreferences({ appearance: mode });
+  }
+
+  function chooseColor(id: ColorThemeId) {
+    setColorTheme(id);
+    void savePreferences({ colorTheme: id });
+  }
 
   return (
     <DropdownMenu>
@@ -106,7 +129,7 @@ export function ThemePicker() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setTheme(item.id)}
+                  onClick={() => chooseMode(item.id)}
                   className={cn(
                     "flex flex-col items-center gap-1 rounded-lg border px-2 py-2 text-xs",
                     active ? "border-primary bg-accent text-foreground" : "border-transparent text-muted-foreground hover:bg-muted",
@@ -129,7 +152,7 @@ export function ThemePicker() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setColorTheme(item.id)}
+                  onClick={() => chooseColor(item.id)}
                   className={cn(
                     "flex items-center gap-2 rounded-lg border px-2 py-2 text-left text-xs",
                     active ? "border-primary bg-accent text-foreground" : "border-transparent text-muted-foreground hover:bg-muted",

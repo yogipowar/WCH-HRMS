@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { APP_NAME, APP_SUBTITLE, COMPANY_NAME, COMPANY_TAGLINE } from "@/lib/constants";
+import { APP_NAME, APP_SUBTITLE, COMPANY_NAME, COMPANY_TAGLINE, DEVELOPED_BY, DEVELOPED_BY_URL } from "@/lib/constants";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { loginFormSchema, type LoginFormValues } from "@/lib/validations/login";
 
@@ -117,6 +117,12 @@ export function LoginPage() {
 
           <p className="text-xs text-muted-foreground">
             © {new Date().getFullYear()} {COMPANY_NAME}. For authorized personnel only.
+            <span className="mt-1 block">
+              Developed by{" "}
+              <a href={DEVELOPED_BY_URL} target="_blank" rel="noreferrer" className="hover:text-foreground">
+                {DEVELOPED_BY}
+              </a>
+            </span>
           </p>
         </div>
       </section>
@@ -229,8 +235,14 @@ export function LoginPage() {
           </div>
 
           {appVersionLabel ? (
-            <p className="pb-5 text-center text-[11px] text-muted-foreground">{appVersionLabel}</p>
+            <p className="pb-2 text-center text-[11px] text-muted-foreground">{appVersionLabel}</p>
           ) : null}
+          <p className="pb-5 text-center text-xs text-muted-foreground lg:hidden">
+            Developed by{" "}
+            <a href={DEVELOPED_BY_URL} target="_blank" rel="noreferrer" className="hover:text-foreground">
+              {DEVELOPED_BY}
+            </a>
+          </p>
         </div>
       </section>
     </div>

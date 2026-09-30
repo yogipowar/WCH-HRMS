@@ -142,6 +142,10 @@ export interface User {
   avatarUrl: string | null;
   username: string;
   password: string;
+  /** Saved color palette for this account. Applied on every login. */
+  colorTheme?: string | null;
+  /** Saved light / dark / system mode for this account. */
+  appearance?: "light" | "dark" | "system" | null;
 }
 
 export interface EmergencyContact {

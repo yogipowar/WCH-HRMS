@@ -63,6 +63,12 @@ export const api = {
   me() {
     return request<{ user: User }>("/api/auth/me");
   },
+  updatePreferences(body: { colorTheme?: string; appearance?: "light" | "dark" | "system" }) {
+    return request<{ user: User }>("/api/auth/preferences", {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    });
+  },
   bootstrap() {
     return request<AppData>("/api/bootstrap");
   },

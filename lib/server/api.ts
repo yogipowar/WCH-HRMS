@@ -28,6 +28,7 @@ import type {
 } from "@/types";
 import { DOCUMENT_TYPES, LEAVE_TYPES } from "@/types";
 import { isPayslipReleased } from "@/lib/payroll/record";
+import { resolveColorTheme } from "@/lib/theme/color-themes";
 import { todayIsoDate } from "@/lib/utils/format";
 
 type Json = Record<string, unknown>;
@@ -91,6 +92,8 @@ function publicUser(row: RowDataPacket, includePassword = false): User {
     avatarUrl: row.avatar_url,
     username: row.username,
     password: includePassword ? String(row.password_plain ?? "") : "",
+    colorTheme: resolveColorTheme(row.color_theme ? String(row.color_theme) : null),
+    appearance: row.appearance === "dark" || row.appearance === "system" ? row.appearance : "light",
   };
 }
 
@@ -910,6 +913,16 @@ export async function handleApiRequest(request: Request, parts: string[]) {
 
     if (parts[0] === "auth" && parts[1] === "me" && request.method === "GET") {
       return jsonResponse(200, { user });
+    }
+
+    if (parts[0] === "auth" && parts[1] === "preferences" && request.method === "PATCH") {
+      const body = (await request.json().catch(() => ({}))) as Json;
+      const colorTheme = resolveColorTheme(body.colorTheme == null ? user.colorTheme : String(body.colorTheme));
+      const requestedAppearance = String(body.appearance ?? user.appearance ?? "light");
+      const appearance = requestedAppearance === "dark" || requestedAppearance === "system" ? requestedAppearance : "light";
+      await execute("UPDATE users SET color_theme = ?, appearance = ? WHERE id = ?", [colorTheme, appearance, user.id]);
+      const rows = await query("SELECT * FROM users WHERE id = ?", [user.id]);
+      return jsonResponse(200, { user: publicUser(rows[0]) });
     }
 
     if (parts[0] === "bootstrap" && request.method === "GET") {

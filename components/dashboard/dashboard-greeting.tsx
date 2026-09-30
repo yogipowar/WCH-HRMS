@@ -2,7 +2,12 @@ import type { ReactNode } from "react";
 
 function greetingName(fullName: string) {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2 && /^(agency|mr|mrs|ms|dr)$/i.test(parts[0])) {
+  const title = parts[0]?.replace(/\./g, "") ?? "";
+  if (parts.length >= 2 && /^(mr|mrs|ms|dr)$/i.test(title)) {
+    const titled = parts[0].endsWith(".") ? parts[0] : `${parts[0]}.`;
+    return `${titled} ${parts[1]}`;
+  }
+  if (parts.length >= 2 && /^agency$/i.test(title)) {
     return parts[1];
   }
   return parts[0] ?? fullName;

@@ -13,6 +13,7 @@ interface AuthStore {
   loginWithGoogle: (credential: string, remember?: boolean) => Promise<{ ok: boolean; error?: string }>;
   logout: () => Promise<void>;
   restore: () => Promise<void>;
+  savePreferences: (patch: { colorTheme?: string; appearance?: "light" | "dark" | "system" }) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthStore>()((set, get) => ({
@@ -83,6 +84,18 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
       setApiToken(null);
       useDataStore.getState().reset();
       set({ user: null, isAuthenticated: false, status: "ready" });
+    }
+  },
+  savePreferences: async (patch) => {
+    const current = get().user;
+    if (!current) return;
+    set({ user: { ...current, ...patch } });
+    try {
+      const { user } = await api.updatePreferences(patch);
+      set({ user });
+    } catch (error) {
+      set({ user: current });
+      console.error("Failed to save theme preference.", error);
     }
   },
 }));
