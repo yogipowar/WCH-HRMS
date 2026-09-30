@@ -32,6 +32,10 @@ export function LoginPage() {
   });
 
   useEffect(() => {
+    window.localStorage.removeItem("wch_hrms_last_login");
+  }, []);
+
+  useEffect(() => {
     const readVersion = () => {
       try {
         if (typeof window.WchHrmsApp?.getVersionName === "function") {
@@ -116,12 +120,12 @@ export function LoginPage() {
         <div className="my-auto flex w-full flex-col gap-5">
         <div>
           <div className="flex w-full min-w-0 flex-col rounded-[28px] border border-border bg-card px-5 py-5 text-card-foreground shadow-none sm:px-6">
-            <h2 className="text-center text-[1.65rem] font-semibold tracking-tight text-foreground">Log in to your account</h2>
+            <h2 className="text-center text-[1.65rem] font-semibold tracking-tight text-foreground">Sign in to your account</h2>
             {dailyLine ? (
               <p className="mt-2 text-center text-sm leading-6 text-muted-foreground">{dailyLine}</p>
             ) : null}
 
-            <form className="mt-5 space-y-3" onSubmit={form.handleSubmit(onSubmit)}>
+            <form className="mt-5 space-y-3" autoComplete="off" onSubmit={form.handleSubmit(onSubmit)}>
               <div className="space-y-2">
                 <Label htmlFor="username" className="text-sm font-medium text-foreground">
                   Username
@@ -132,10 +136,10 @@ export function LoginPage() {
                   </span>
                   <Input
                     id="username"
-                    autoComplete="username"
                     className={fieldClass}
                     placeholder="Username or work email"
                     {...form.register("username")}
+                    autoComplete="off"
                   />
                 </div>
                 {form.formState.errors.username ? (
@@ -153,11 +157,11 @@ export function LoginPage() {
                   </span>
                   <Input
                     id="password"
-                    type={showPassword ? "text" : "password"}
-                    autoComplete="current-password"
-                    className={fieldClass}
+                    type="text"
+                    className={showPassword ? fieldClass : `${fieldClass} [-webkit-text-security:disc]`}
                     placeholder="Enter your password"
                     {...form.register("password")}
+                    autoComplete="off"
                   />
                   <button
                     type="button"
@@ -192,7 +196,7 @@ export function LoginPage() {
                 className="h-11 w-full text-[15px] font-medium shadow-none"
                 disabled={form.formState.isSubmitting || googleBusy}
               >
-                Log in
+                Sign in
               </Button>
             </form>
 

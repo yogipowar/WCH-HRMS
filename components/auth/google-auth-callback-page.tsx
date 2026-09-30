@@ -108,7 +108,7 @@ export function GoogleAuthCallbackPage() {
 
       const idToken = hash.get("id_token") || query.get("credential") || "";
       if (!idToken) {
-        setMessage("Missing Google token. Returning to login…");
+        setMessage("Missing Google token. Returning to sign in…");
         window.setTimeout(() => router.replace("/login?native=1"), 1600);
         return;
       }

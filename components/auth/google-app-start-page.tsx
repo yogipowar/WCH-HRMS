@@ -128,7 +128,7 @@ export function GoogleAppStartPage() {
           </a>
         ) : null}
         <a href="/login?native=1" className="block text-xs text-muted-foreground underline-offset-2 hover:underline">
-          Back to login
+          Back to sign in
         </a>
       </div>
     </div>

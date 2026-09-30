@@ -382,7 +382,7 @@ export function EmployeeForm({ employee }: { employee?: Employee }) {
         </p>
       </Section>
 
-      <Section title="Login credentials">
+      <Section title="Sign-in credentials">
         <Field label="Username" error={form.formState.errors.username?.message}>
           <Input autoComplete="off" placeholder="e.g. neha.patel" {...form.register("username")} />
         </Field>
@@ -398,7 +398,7 @@ export function EmployeeForm({ employee }: { employee?: Employee }) {
           <Input
             type={showPassword ? "text" : "password"}
             autoComplete="new-password"
-            placeholder={employee ? "Leave blank to keep current" : "Set a login password"}
+            placeholder={employee ? "Leave blank to keep current" : "Set a sign-in password"}
             {...form.register("password")}
           />
         </Field>

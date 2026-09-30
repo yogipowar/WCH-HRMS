@@ -69,7 +69,7 @@ export function EmployeesListPage() {
       { id: "joining", header: "Joining date", accessor: (row) => row.joiningDate, cell: (row) => formatDate(row.joiningDate) },
       {
         id: "login",
-        header: "Login",
+        header: "Sign in",
         accessor: (row) => data.users.find((user) => user.id === row.userId)?.username ?? "",
         cell: (row) => {
           const account = data.users.find((user) => user.id === row.userId);
