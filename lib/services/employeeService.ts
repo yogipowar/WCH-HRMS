@@ -2,7 +2,7 @@ import { api } from "@/lib/api/client";
 import { getData, updateData } from "@/lib/stores/data-store";
 import { createId } from "@/lib/lookups";
 import { isUsernameTaken } from "@/lib/auth/credentials";
-import { defaultLeaveBalance } from "@/lib/leave/policy";
+import { leaveBalanceFromSpent, type SpentLeaves } from "@/lib/leave/policy";
 import { buildPayrollRecord, CURRENT_PAYROLL_PERIOD, payrollAmounts } from "@/lib/payroll/record";
 import type { Employee } from "@/types";
 
@@ -21,7 +21,11 @@ export const employeeService = {
   getEmployeeByCode(code: string) {
     return getData().employees.find((item) => item.employeeCode === code) ?? null;
   },
-  async createEmployee(input: Omit<Employee, "id">, login: { username: string; password: string }) {
+  async createEmployee(
+    input: Omit<Employee, "id">,
+    login: { username: string; password: string },
+    openingLeave?: SpentLeaves,
+  ) {
     if (isUsernameTaken(login.username)) {
       throw new Error("This username is already taken.");
     }
@@ -39,7 +43,11 @@ export const employeeService = {
       username: login.username.trim(),
       password: login.password,
     };
-    const leaveBalance = defaultLeaveBalance(employee.id);
+    const leaveBalance = leaveBalanceFromSpent(employee.id, {
+      casual: openingLeave?.casual ?? 0,
+      sick: openingLeave?.sick ?? 0,
+      privilege: openingLeave?.privilege ?? 0,
+    });
     const payrollRecord = buildPayrollRecord(savedEmployee);
     updateData((data) => ({
       employees: [...data.employees, savedEmployee],
@@ -60,7 +68,7 @@ export const employeeService = {
     }
     return savedEmployee;
   },
-  updateEmployee(id: string, patch: Partial<Employee>, login?: EmployeeLogin) {
+  updateEmployee(id: string, patch: Partial<Employee>, login?: EmployeeLogin, spentLeaves?: SpentLeaves) {
     if (login?.username) {
       const employee = getData().employees.find((item) => item.id === id);
       if (isUsernameTaken(login.username, employee?.userId)) {
@@ -98,10 +106,16 @@ export const employeeService = {
       const payrollRecord = payrollRecords.find(
         (item) => item.employeeId === id && item.period === CURRENT_PAYROLL_PERIOD,
       );
+      const leaveBalance = spentLeaves ? leaveBalanceFromSpent(id, spentLeaves, data.leaveRequests) : undefined;
+      const leaveBalances = leaveBalance
+        ? data.leaveBalances.some((item) => item.employeeId === id)
+          ? data.leaveBalances.map((item) => (item.employeeId === id ? leaveBalance : item))
+          : [...data.leaveBalances, leaveBalance]
+        : data.leaveBalances;
       if (user) {
-        void api.updateEmployee(id, { employee, user, payrollRecord }).catch(() => undefined);
+        void api.updateEmployee(id, { employee, user, payrollRecord, leaveBalance }).catch(() => undefined);
       }
-      return { employees, users, payrollRecords };
+      return { employees, users, payrollRecords, leaveBalances };
     });
   },
   deactivateEmployee(id: string) {

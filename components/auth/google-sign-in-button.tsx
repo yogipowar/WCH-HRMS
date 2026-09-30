@@ -116,39 +116,12 @@ export function GoogleSignInButton({
         }
 
         const existing = document.querySelector<HTMLScriptElement>("script[data-google-gsi]");
-        const init = () => {
-          if (!buttonRef.current || !window.google?.accounts?.id) return;
-          window.google.accounts.id.initialize({
-            client_id: config.clientId,
-            callback: (response) => {
-              void onSuccessRef.current(response.credential);
-            },
-            auto_select: false,
-            cancel_on_tap_outside: true,
-          });
-          buttonRef.current.innerHTML = "";
-          const available = Math.floor(buttonRef.current.clientWidth || 0);
-          const width = Math.min(400, Math.max(240, available || 280));
-          window.google.accounts.id.renderButton(buttonRef.current, {
-            theme: "outline",
-            size: "large",
-            text: "continue_with",
-            shape: "rectangular",
-            width,
-            logo_alignment: "left",
-          });
-          setReady(true);
-        };
-        if (existing && window.google?.accounts?.id) {
-          init();
-          return;
-        }
+        if (existing) return;
         const script = document.createElement("script");
         script.src = "https://accounts.google.com/gsi/client";
         script.async = true;
         script.defer = true;
         script.dataset.googleGsi = "true";
-        script.onload = init;
         script.onerror = () => onErrorRef.current("Could not load Google Sign-In.");
         document.head.appendChild(script);
       })
@@ -164,6 +137,43 @@ export function GoogleSignInButton({
     if (!enabled) return;
     sessionStorage.setItem("wch_google_oauth_remember", rememberMe ? "1" : "0");
   }, [enabled, rememberMe]);
+
+  useEffect(() => {
+    if (!enabled || !clientId || nativeApp) return;
+    let cancelled = false;
+    const render = () => {
+      if (cancelled || !buttonRef.current || !window.google?.accounts?.id) return false;
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: (response) => {
+          void onSuccessRef.current(response.credential);
+        },
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      });
+      buttonRef.current.innerHTML = "";
+      const available = Math.floor(buttonRef.current.clientWidth || buttonRef.current.parentElement?.clientWidth || 0);
+      const width = Math.min(400, Math.max(240, available || 280));
+      window.google.accounts.id.renderButton(buttonRef.current, {
+        theme: "outline",
+        size: "large",
+        text: "continue_with",
+        shape: "rectangular",
+        width,
+        logo_alignment: "left",
+      });
+      setReady(true);
+      return true;
+    };
+    if (render()) return;
+    const timer = window.setInterval(() => {
+      if (render()) window.clearInterval(timer);
+    }, 150);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [clientId, enabled, nativeApp]);
 
   if (!enabled) return null;
 
@@ -182,7 +192,7 @@ export function GoogleSignInButton({
         <Button
           type="button"
           variant="outline"
-          className="h-12 w-full"
+          className="h-11 w-full shadow-none"
           onClick={() => {
             if (!clientId) {
               onError("Google Sign-In is not configured.");
@@ -195,10 +205,17 @@ export function GoogleSignInButton({
           Continue with Google
         </Button>
       ) : (
-        <>
-          <div ref={buttonRef} className="flex min-h-11 w-full max-w-full justify-center overflow-hidden [&_iframe]:max-w-full" />
-          {!ready ? <p className="text-center text-xs text-muted-foreground">Loading Google…</p> : null}
-        </>
+        <div className="relative h-11 w-full">
+          <Button type="button" variant="outline" tabIndex={-1} aria-hidden className="pointer-events-none h-11 w-full shadow-none">
+            <GoogleMark />
+            Continue with Google
+          </Button>
+          <div
+            ref={buttonRef}
+            className="absolute inset-0 z-10 overflow-hidden opacity-0 [&_.nsm7Bb-HzV7m-LgbsSe]:!h-11 [&_.nsm7Bb-HzV7m-LgbsSe]:!max-w-none [&_.nsm7Bb-HzV7m-LgbsSe]:!w-full"
+          />
+          {!ready ? <span className="sr-only">Loading Google</span> : null}
+        </div>
       )}
     </div>
   );

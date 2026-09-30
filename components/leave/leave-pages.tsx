@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { formFieldControlClass, formGridClass, formWideClass } from "@/lib/ui/form-styles";
-import { remainingPaidDays, YEARLY_PAID_LEAVE_LABEL, YEARLY_PAID_LEAVE_TOTAL, YEARLY_PAID_LEAVES } from "@/lib/leave/policy";
+import { currentLeaveYearEnd, leaveYearLabel, remainingPaidDays, YEARLY_PAID_LEAVE_LABEL, YEARLY_PAID_LEAVE_TOTAL, YEARLY_PAID_LEAVES } from "@/lib/leave/policy";
 import { daysBetweenInclusive, formatDate, formatDateTime, leaveTypeLabel, todayIsoDate } from "@/lib/utils/format";
 import { getDepartmentName, getEmployeeByUser, getEmployeeName } from "@/lib/lookups";
 import { leaveService } from "@/lib/services/leaveService";
@@ -114,7 +114,7 @@ function EmployeeLeave({ employeeId }: { employeeId: string }) {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="My leaves" description={YEARLY_PAID_LEAVE_LABEL} />
+      <PageHeader title="My leaves" description={`${YEARLY_PAID_LEAVE_LABEL}. Leave year ${leaveYearLabel()}. Unused leave is not carried forward.`} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Balance title="Casual leave (CL)" value={balance.casual} entitlement={YEARLY_PAID_LEAVES.casual} />
         <Balance title="Sick leave (SL)" value={balance.sick} entitlement={YEARLY_PAID_LEAVES.sick} />
@@ -135,12 +135,12 @@ function EmployeeLeave({ employeeId }: { employeeId: string }) {
             </div>
             <div>
               <Label>Start date</Label>
-              <Input type="date" min={today} className="mt-1.5" {...form.register("startDate")} />
+              <Input type="date" min={today} max={currentLeaveYearEnd()} className="mt-1.5" {...form.register("startDate")} />
               <FieldError message={form.formState.errors.startDate?.message} />
             </div>
             <div>
               <Label>End date</Label>
-              <Input type="date" min={startDate || today} className="mt-1.5" {...form.register("endDate")} />
+              <Input type="date" min={startDate || today} max={currentLeaveYearEnd()} className="mt-1.5" {...form.register("endDate")} />
               <FieldError message={form.formState.errors.endDate?.message} />
             </div>
             <div className="flex h-10 items-center gap-2 md:mt-7">
@@ -157,15 +157,15 @@ function EmployeeLeave({ employeeId }: { employeeId: string }) {
               />
               <p className="mt-1.5 text-xs text-muted-foreground">Optional PDF, Word, or image up to 10 MB.</p>
             </div>
-            <div className="flex items-end">
-              <Button type="submit" className="w-full md:w-auto" disabled={saving}>
-                {saving ? "Submitting…" : "Submit request"}
-              </Button>
-            </div>
             <div className={formWideClass}>
               <Label>Reason</Label>
               <Textarea className="mt-1.5" {...form.register("reason")} />
               <FieldError message={form.formState.errors.reason?.message} />
+            </div>
+            <div className={formWideClass}>
+              <Button type="submit" disabled={saving}>
+                {saving ? "Submitting…" : "Submit request"}
+              </Button>
             </div>
           </form>
         </CardContent>
@@ -239,7 +239,7 @@ function ManagementLeave({ data, reviewerId }: { data: ReturnType<typeof useData
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Leave management" description={YEARLY_PAID_LEAVE_LABEL} />
+      <PageHeader title="Leave management" description={`${YEARLY_PAID_LEAVE_LABEL}. Leave year ${leaveYearLabel()}. Unused leave is not carried forward.`} />
       <DataTable
         data={rows}
         columns={columns}

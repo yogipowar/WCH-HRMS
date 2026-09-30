@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isInCurrentLeaveYear, leaveYearLabel } from "@/lib/leave/policy";
 import { todayIsoDate } from "@/lib/utils/format";
 
 export const leaveFormSchema = z
@@ -16,6 +17,10 @@ export const leaveFormSchema = z
   .refine((value) => value.startDate >= todayIsoDate(), {
     message: "Leave date cannot be earlier than today",
     path: ["startDate"],
+  })
+  .refine((value) => isInCurrentLeaveYear(value.startDate) && isInCurrentLeaveYear(value.endDate), {
+    message: `Leave must fall in the current leave year (${leaveYearLabel()}). Unused leave is not carried forward.`,
+    path: ["endDate"],
   });
 
 export type LeaveFormValues = z.infer<typeof leaveFormSchema>;

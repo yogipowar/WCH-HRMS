@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { YEARLY_PAID_LEAVES } from "@/lib/leave/policy";
 
 export const employeeFormSchema = z.object({
   fullName: z.string().min(2, "Full name is required"),
@@ -37,6 +38,24 @@ export const employeeFormSchema = z.object({
   bankName: z.string().optional(),
   bankAccountNumber: z.string().optional(),
   bankIfsc: z.string().optional(),
+  spentCasual: z.number().min(0, "Spent casual leave cannot be negative"),
+  spentSick: z.number().min(0, "Spent sick leave cannot be negative"),
+  spentPrivilege: z.number().min(0, "Spent privilege leave cannot be negative"),
+}).superRefine((values, ctx) => {
+  const checks = [
+    ["spentCasual", values.spentCasual, YEARLY_PAID_LEAVES.casual, "casual"],
+    ["spentSick", values.spentSick, YEARLY_PAID_LEAVES.sick, "sick"],
+    ["spentPrivilege", values.spentPrivilege, YEARLY_PAID_LEAVES.privilege, "privilege"],
+  ] as const;
+  for (const [path, spent, max, label] of checks) {
+    if (spent > max) {
+      ctx.addIssue({
+        code: "custom",
+        path: [path],
+        message: `Spent ${label} leave cannot be more than ${max}.`,
+      });
+    }
+  }
 });
 
 export type EmployeeFormValues = z.infer<typeof employeeFormSchema>;

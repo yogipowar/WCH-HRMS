@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useForm, type UseFormRegister } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -17,8 +17,9 @@ import { formGridClass, formWideClass } from "@/lib/ui/form-styles";
 import { createId } from "@/lib/lookups";
 import { employeeService } from "@/lib/services/employeeService";
 import { useDataStore } from "@/lib/stores/data-store";
+import { YEARLY_PAID_LEAVES, leaveYearLabel } from "@/lib/leave/policy";
 import { employeeFormSchema, type EmployeeFormValues } from "@/lib/validations/employee";
-import type { Employee } from "@/types";
+import type { Employee, LeaveBalance } from "@/types";
 
 const baseDefaults: EmployeeFormValues = {
   fullName: "",
@@ -52,12 +53,16 @@ const baseDefaults: EmployeeFormValues = {
   bankName: "",
   bankAccountNumber: "",
   bankIfsc: "",
+  spentCasual: 0,
+  spentSick: 0,
+  spentPrivilege: 0,
 };
 
 function toDefaults(
   employee: Employee | undefined,
   username: string,
   settings: { defaultDailyHours: number; workStartTime: string; lateAfterMinutes: number },
+  balance?: LeaveBalance,
 ): EmployeeFormValues {
   if (!employee) {
     return {
@@ -99,6 +104,9 @@ function toDefaults(
     bankName: employee.bankInformation.bankName,
     bankAccountNumber: employee.bankInformation.accountNumber,
     bankIfsc: employee.bankInformation.ifscCode,
+    spentCasual: balance?.spentCasual ?? 0,
+    spentSick: balance?.spentSick ?? 0,
+    spentPrivilege: balance?.spentPrivilege ?? 0,
   };
 }
 
@@ -109,13 +117,22 @@ export function EmployeeForm({ employee }: { employee?: Employee }) {
   const employees = useDataStore((state) => state.employees);
   const users = useDataStore((state) => state.users);
   const settings = useDataStore((state) => state.settings);
+  const leaveBalance = useDataStore((state) => state.leaveBalances.find((item) => item.employeeId === employee?.id));
   const [showPassword, setShowPassword] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(employee?.avatarUrl ?? null);
   const account = users.find((item) => item.id === employee?.userId);
   const form = useForm<EmployeeFormValues>({
     resolver: zodResolver(employeeFormSchema),
-    defaultValues: toDefaults(employee, account?.username ?? "", settings),
+    defaultValues: toDefaults(employee, account?.username ?? "", settings, leaveBalance),
   });
+  const spentHydrated = useRef(false);
+  useEffect(() => {
+    if (!employee || !leaveBalance || spentHydrated.current) return;
+    form.setValue("spentCasual", leaveBalance.spentCasual ?? 0);
+    form.setValue("spentSick", leaveBalance.spentSick ?? 0);
+    form.setValue("spentPrivilege", leaveBalance.spentPrivilege ?? 0);
+    spentHydrated.current = true;
+  }, [employee, form, leaveBalance]);
   const selectedDepartmentId = form.watch("departmentId");
   const selectedDesignationId = form.watch("designationId");
   const watchedName = form.watch("fullName");
@@ -196,19 +213,36 @@ export function EmployeeForm({ employee }: { employee?: Employee }) {
 
     try {
       if (employee) {
-        employeeService.updateEmployee(employee.id, payload, {
-          username: values.username,
-          password: values.password || undefined,
-        });
+        employeeService.updateEmployee(
+          employee.id,
+          payload,
+          {
+            username: values.username,
+            password: values.password || undefined,
+          },
+          {
+            casual: values.spentCasual,
+            sick: values.spentSick,
+            privilege: values.spentPrivilege,
+          },
+        );
         toast.success("Employee updated.");
         router.push(`/employees/${employee.id}`);
         return;
       }
 
-      const created = await employeeService.createEmployee(payload, {
-        username: values.username,
-        password: values.password,
-      });
+      const created = await employeeService.createEmployee(
+        payload,
+        {
+          username: values.username,
+          password: values.password,
+        },
+        {
+          casual: values.spentCasual,
+          sick: values.spentSick,
+          privilege: values.spentPrivilege,
+        },
+      );
       toast.success("Employee added. They can sign in with the username and password you set.");
       router.push(`/employees/${created.id}`);
     } catch (error) {
@@ -294,6 +328,17 @@ export function EmployeeForm({ employee }: { employee?: Employee }) {
         <Field label="Joining date" error={form.formState.errors.joiningDate?.message}>
           <Input type="date" {...form.register("joiningDate")} />
         </Field>
+        <SpentLeaveFields
+          spentCasual={form.watch("spentCasual")}
+          spentSick={form.watch("spentSick")}
+          spentPrivilege={form.watch("spentPrivilege")}
+          errors={{
+            casual: form.formState.errors.spentCasual?.message,
+            sick: form.formState.errors.spentSick?.message,
+            privilege: form.formState.errors.spentPrivilege?.message,
+          }}
+          register={form.register}
+        />
         <Field label="Employment type" error={form.formState.errors.employmentType?.message}>
           <NativeSelect {...form.register("employmentType")}>
             <option value="FULL_TIME">Full-time</option>
@@ -427,6 +472,45 @@ export function EmployeeForm({ employee }: { employee?: Employee }) {
         </Button>
       </div>
     </form>
+  );
+}
+
+function spentRemaining(spent: number, quota: number): number {
+  const used = Number.isFinite(spent) ? spent : 0;
+  return Math.max(0, Number((quota - used).toFixed(1)));
+}
+
+function SpentLeaveFields({
+  spentCasual,
+  spentSick,
+  spentPrivilege,
+  errors,
+  register,
+}: {
+  spentCasual: number;
+  spentSick: number;
+  spentPrivilege: number;
+  errors: { casual?: string; sick?: string; privilege?: string };
+  register: UseFormRegister<EmployeeFormValues>;
+}) {
+  return (
+    <>
+      <Field label="Spent casual leave (CL)" error={errors.casual}>
+        <Input type="number" min={0} max={YEARLY_PAID_LEAVES.casual} step={0.5} {...register("spentCasual", { valueAsNumber: true })} />
+      </Field>
+      <Field label="Spent sick leave (SL)" error={errors.sick}>
+        <Input type="number" min={0} max={YEARLY_PAID_LEAVES.sick} step={0.5} {...register("spentSick", { valueAsNumber: true })} />
+      </Field>
+      <Field label="Spent privilege leave (PL)" error={errors.privilege}>
+        <Input type="number" min={0} max={YEARLY_PAID_LEAVES.privilege} step={0.5} {...register("spentPrivilege", { valueAsNumber: true })} />
+      </Field>
+      <p className={`${formWideClass} text-xs text-muted-foreground`}>
+        Leave year is {leaveYearLabel()}. Unused leave is not carried forward. Enter days already used in each type.
+        After this, casual has {spentRemaining(spentCasual, YEARLY_PAID_LEAVES.casual)} of {YEARLY_PAID_LEAVES.casual} left, sick has{" "}
+        {spentRemaining(spentSick, YEARLY_PAID_LEAVES.sick)} of {YEARLY_PAID_LEAVES.sick} left, and privilege has{" "}
+        {spentRemaining(spentPrivilege, YEARLY_PAID_LEAVES.privilege)} of {YEARLY_PAID_LEAVES.privilege} left. Approved leave requests are deducted as well.
+      </p>
+    </>
   );
 }
 

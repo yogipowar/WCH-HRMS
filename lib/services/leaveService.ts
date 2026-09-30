@@ -1,6 +1,6 @@
 import { api } from "@/lib/api/client";
 import { BASE_PATH } from "@/lib/constants";
-import { applyLeaveToBalance, defaultLeaveBalance, leaveDaysUsed, paidLeaveKey } from "@/lib/leave/policy";
+import { applyLeaveToBalance, balanceForCurrentLeaveYear, defaultLeaveBalance, isInCurrentLeaveYear, leaveDaysUsed, leaveYearLabel, paidLeaveKey } from "@/lib/leave/policy";
 import { getData, updateData } from "@/lib/stores/data-store";
 import type { LeaveRequest, LeaveStatus, LeaveType } from "@/types";
 
@@ -15,7 +15,8 @@ export const leaveService = {
     return getData().leaveRequests.find((item) => item.id === id) ?? null;
   },
   getBalance(employeeId: string) {
-    return getData().leaveBalances.find((item) => item.employeeId === employeeId) ?? defaultLeaveBalance(employeeId);
+    const balance = getData().leaveBalances.find((item) => item.employeeId === employeeId) ?? defaultLeaveBalance(employeeId);
+    return balanceForCurrentLeaveYear(balance);
   },
   leaveAttachmentHref(id: string) {
     return `${BASE_PATH}/api/leave/${id}/attachment`;
@@ -29,6 +30,10 @@ export const leaveService = {
     reason: string;
     file?: File | null;
   }) {
+    const endDate = input.isHalfDay ? input.startDate : input.endDate;
+    if (!isInCurrentLeaveYear(input.startDate) || !isInCurrentLeaveYear(endDate)) {
+      throw new Error(`Leave must fall in the current leave year (${leaveYearLabel()}). Unused leave is not carried forward.`);
+    }
     const key = paidLeaveKey(input.type);
     if (key) {
       const balance = this.getBalance(input.employeeId);
@@ -73,14 +78,16 @@ export const leaveService = {
             }
           : item,
       );
-      let leaveBalances = data.leaveBalances;
+      let leaveBalances = data.leaveBalances.map((item) =>
+        item.employeeId === current.employeeId ? balanceForCurrentLeaveYear(item) : item,
+      );
       if (current.status !== "APPROVED" && status === "APPROVED") {
-        leaveBalances = data.leaveBalances.map((item) =>
+        leaveBalances = leaveBalances.map((item) =>
           item.employeeId === current.employeeId ? applyLeaveToBalance(item, current, "deduct") : item,
         );
       }
       if (current.status === "APPROVED" && status !== "APPROVED") {
-        leaveBalances = data.leaveBalances.map((item) =>
+        leaveBalances = leaveBalances.map((item) =>
           item.employeeId === current.employeeId ? applyLeaveToBalance(item, current, "restore") : item,
         );
       }

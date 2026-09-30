@@ -11,7 +11,7 @@ import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import { LeaveStatusBadge } from "@/components/shared/status-badge";
 import { LinkButton } from "@/components/shared/link-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { YEARLY_PAID_LEAVE_TOTAL, YEARLY_PAID_LEAVES, remainingPaidDays } from "@/lib/leave/policy";
+import { leaveYearLabel, YEARLY_PAID_LEAVE_TOTAL, YEARLY_PAID_LEAVES, remainingPaidDays } from "@/lib/leave/policy";
 import { formatEmployeeDisplayName } from "@/lib/employee/display";
 import { getDepartmentName, getDesignationName } from "@/lib/lookups";
 import { isPayslipReleased } from "@/lib/payroll/record";
@@ -171,6 +171,7 @@ export function EmployeeDashboard({ employee }: { employee: Employee }) {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Leave summary</CardTitle>
+              <p className="text-xs text-muted-foreground">Leave year {leaveYearLabel()}. Unused leave is not carried forward.</p>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
               <LeaveBalanceRow label="Paid remaining" value={paidLeft} total={YEARLY_PAID_LEAVE_TOTAL} />

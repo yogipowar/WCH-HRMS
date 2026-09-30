@@ -91,6 +91,7 @@ export async function getPool(): Promise<Pool> {
     await ensureProjectsTable(pool);
     await ensurePasswordPlainColumn(pool);
     await ensureUserPreferenceColumns(pool);
+    await ensureLeaveBalanceYearColumn(pool);
     schemaReady = true;
   }
   return pool;
@@ -248,6 +249,31 @@ export async function ensureUserPreferenceColumns(db?: Pool) {
     await pool.query("ALTER TABLE users ADD COLUMN appearance VARCHAR(16) NOT NULL DEFAULT 'light'");
   }
   userPreferenceColumnsReady = true;
+}
+
+let leaveBalanceYearReady = false;
+
+export async function ensureLeaveBalanceYearColumn(db?: Pool) {
+  if (leaveBalanceYearReady) return;
+  const pool = db ?? (await getPool());
+  const [columns] = await pool.query<RowDataPacket[]>(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'leave_balances'`,
+  );
+  const names = new Set(columns.map((row) => String(row.COLUMN_NAME)));
+  if (!names.has("year_start")) {
+    await pool.query("ALTER TABLE leave_balances ADD COLUMN year_start DATE NULL");
+  }
+  if (!names.has("spent_casual")) {
+    await pool.query("ALTER TABLE leave_balances ADD COLUMN spent_casual DECIMAL(6,1) NOT NULL DEFAULT 0");
+  }
+  if (!names.has("spent_sick")) {
+    await pool.query("ALTER TABLE leave_balances ADD COLUMN spent_sick DECIMAL(6,1) NOT NULL DEFAULT 0");
+  }
+  if (!names.has("spent_privilege")) {
+    await pool.query("ALTER TABLE leave_balances ADD COLUMN spent_privilege DECIMAL(6,1) NOT NULL DEFAULT 0");
+  }
+  leaveBalanceYearReady = true;
 }
 
 export async function query<T extends RowDataPacket>(sql: string, params: unknown[] = []) {

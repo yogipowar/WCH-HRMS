@@ -18,7 +18,7 @@ import { formatDuration, summarizeAttendance } from "@/lib/attendance/calculatio
 import { findOpenAttendance } from "@/lib/attendance/session";
 import { formatEmployeeDisplayName } from "@/lib/employee/display";
 import { getDepartmentName, getDesignationName, getReportingPersonName, toLiveStatus } from "@/lib/lookups";
-import { remainingPaidDays, YEARLY_PAID_LEAVE_TOTAL, YEARLY_PAID_LEAVES } from "@/lib/leave/policy";
+import { leaveYearLabel, remainingPaidDays, YEARLY_PAID_LEAVE_TOTAL, YEARLY_PAID_LEAVES } from "@/lib/leave/policy";
 import { documentService } from "@/lib/services/documentService";
 import { PayslipActions } from "@/components/payroll/payslip-actions";
 import { PayrollStatusControl } from "@/components/payroll/payroll-status-control";
@@ -189,6 +189,7 @@ export function EmployeeProfilePage({ employeeId }: { employeeId: string }) {
           </Card>
         </TabsContent>
         <TabsContent value="leaves" className="space-y-4">
+          <p className="text-sm text-muted-foreground">Leave year {leaveYearLabel()}. Unused leave is not carried forward.</p>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <InfoCard title="Casual (CL)" value={`${balance?.casual ?? 0} / ${YEARLY_PAID_LEAVES.casual} days`} />
             <InfoCard title="Sick (SL)" value={`${balance?.sick ?? 0} / ${YEARLY_PAID_LEAVES.sick} days`} />

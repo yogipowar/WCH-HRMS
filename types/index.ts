@@ -241,6 +241,12 @@ export interface LeaveBalance {
   casual: number;
   sick: number;
   privilege: number;
+  /** Days already used before they were recorded as leave requests, per type. */
+  spentCasual?: number;
+  spentSick?: number;
+  spentPrivilege?: number;
+  /** 1 April of the leave year these remaining days belong to. */
+  yearStart?: string;
 }
 
 export interface LeaveRequest {

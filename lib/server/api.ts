@@ -3,7 +3,7 @@ import type { RowDataPacket } from "mysql2";
 import { settings as defaultSettings } from "@/data/mock-data";
 import type { AppData } from "@/data/mock-data";
 import { createId } from "@/lib/lookups";
-import { ensureDocumentFileColumns, ensureEmployeeScheduleColumns, ensureLateRemovalTable, ensureLeaveAttachmentColumns, ensurePasswordPlainColumn, ensureProjectsTable, execute, query } from "@/lib/server/db";
+import { ensureDocumentFileColumns, ensureEmployeeScheduleColumns, ensureLateRemovalTable, ensureLeaveAttachmentColumns, ensureLeaveBalanceYearColumn, ensurePasswordPlainColumn, ensureProjectsTable, execute, query } from "@/lib/server/db";
 import { clearTokenCookie, signToken, tokenCookie, tokenFromRequest, verifyToken } from "@/lib/server/auth";
 import { isGoogleSignInConfigured, verifyGoogleIdToken } from "@/lib/server/google-auth";
 import { createGoogleHandoff, takeGoogleHandoff } from "@/lib/server/google-handoff";
@@ -27,6 +27,7 @@ import type {
   User,
 } from "@/types";
 import { DOCUMENT_TYPES, LEAVE_TYPES } from "@/types";
+import { applyLeaveToBalance, currentLeaveYearStart, defaultLeaveBalance, isInCurrentLeaveYear, leaveYearLabel, YEARLY_PAID_LEAVES } from "@/lib/leave/policy";
 import { isPayslipReleased } from "@/lib/payroll/record";
 import { resolveColorTheme } from "@/lib/theme/color-themes";
 import { todayIsoDate } from "@/lib/utils/format";
@@ -287,6 +288,33 @@ function mapPayroll(row: RowDataPacket): PayrollRecord {
   };
 }
 
+async function alignLeaveBalancesToYear(rows: RowDataPacket[]) {
+  const start = currentLeaveYearStart();
+  for (const row of rows) {
+    const yearStart = dateOnly(row.year_start);
+    if (!yearStart) {
+      await execute("UPDATE leave_balances SET year_start=? WHERE employee_id=?", [start, row.employee_id]);
+      row.year_start = start;
+      continue;
+    }
+    if (yearStart < start) {
+      await execute(
+        `UPDATE leave_balances
+         SET casual=?, sick=?, privilege=?, spent_casual=0, spent_sick=0, spent_privilege=0, year_start=?
+         WHERE employee_id=?`,
+        [YEARLY_PAID_LEAVES.casual, YEARLY_PAID_LEAVES.sick, YEARLY_PAID_LEAVES.privilege, start, row.employee_id],
+      );
+      row.casual = YEARLY_PAID_LEAVES.casual;
+      row.sick = YEARLY_PAID_LEAVES.sick;
+      row.privilege = YEARLY_PAID_LEAVES.privilege;
+      row.spent_casual = 0;
+      row.spent_sick = 0;
+      row.spent_privilege = 0;
+      row.year_start = start;
+    }
+  }
+}
+
 export async function loadBootstrap(includePasswords = false): Promise<AppData> {
   await ensureDocumentFileColumns();
   await ensureLeaveAttachmentColumns();
@@ -294,6 +322,7 @@ export async function loadBootstrap(includePasswords = false): Promise<AppData> 
   await ensureEmployeeScheduleColumns();
   await ensureProjectsTable();
   await ensurePasswordPlainColumn();
+  await ensureLeaveBalanceYearColumn();
   const [
     users,
     employees,
@@ -338,6 +367,8 @@ export async function loadBootstrap(includePasswords = false): Promise<AppData> 
     query("SELECT payload FROM settings WHERE id = 1"),
   ]);
 
+  await alignLeaveBalancesToYear(leaveBalances);
+
   return {
     users: users.map((row) => publicUser(row, includePasswords)),
     employees: employees.map(mapEmployee),
@@ -361,6 +392,10 @@ export async function loadBootstrap(includePasswords = false): Promise<AppData> 
       casual: number(row.casual),
       sick: number(row.sick),
       privilege: number(row.privilege),
+      spentCasual: number(row.spent_casual),
+      spentSick: number(row.spent_sick),
+      spentPrivilege: number(row.spent_privilege),
+      yearStart: dateOnly(row.year_start) || currentLeaveYearStart(),
     })),
     leaveRequests: leaveRequests.map(mapLeave),
     lateRemovalRequests: lateRemovalRequests.map(mapLateRemoval),
@@ -667,6 +702,11 @@ async function createLeaveFromRequest(request: Request, user: User) {
   if (endDate < startDate) {
     return jsonResponse(400, { error: "End date cannot be before the start date." });
   }
+  if (!isInCurrentLeaveYear(startDate) || !isInCurrentLeaveYear(isHalfDay ? startDate : endDate)) {
+    return jsonResponse(400, {
+      error: `Leave must fall in the current leave year (${leaveYearLabel()}). Unused leave is not carried forward.`,
+    });
+  }
   if (reason.length < 8) {
     return jsonResponse(400, { error: "Please provide a short reason." });
   }
@@ -949,9 +989,21 @@ export async function handleApiRequest(request: Request, parts: string[]) {
       await upsertUser(body.user, body.user.password);
       if (body.leaveBalance) {
         await execute(
-          `INSERT INTO leave_balances (employee_id, casual, sick, privilege) VALUES (?,?,?,?)
-           ON DUPLICATE KEY UPDATE casual=VALUES(casual), sick=VALUES(sick), privilege=VALUES(privilege)`,
-          [body.leaveBalance.employeeId, body.leaveBalance.casual, body.leaveBalance.sick, body.leaveBalance.privilege],
+          `INSERT INTO leave_balances (employee_id, casual, sick, privilege, spent_casual, spent_sick, spent_privilege, year_start)
+           VALUES (?,?,?,?,?,?,?,?)
+           ON DUPLICATE KEY UPDATE casual=VALUES(casual), sick=VALUES(sick), privilege=VALUES(privilege),
+             spent_casual=VALUES(spent_casual), spent_sick=VALUES(spent_sick), spent_privilege=VALUES(spent_privilege),
+             year_start=VALUES(year_start)`,
+          [
+            body.leaveBalance.employeeId,
+            body.leaveBalance.casual,
+            body.leaveBalance.sick,
+            body.leaveBalance.privilege,
+            body.leaveBalance.spentCasual ?? 0,
+            body.leaveBalance.spentSick ?? 0,
+            body.leaveBalance.spentPrivilege ?? 0,
+            body.leaveBalance.yearStart || currentLeaveYearStart(),
+          ],
         );
       }
       if (body.payrollRecord) await upsertPayroll(body.payrollRecord);
@@ -963,6 +1015,7 @@ export async function handleApiRequest(request: Request, parts: string[]) {
         employee?: Employee;
         user?: User;
         payrollRecord?: PayrollRecord;
+        leaveBalance?: LeaveBalance;
       };
       if (user.role !== "MANAGEMENT") {
         if (!user.employeeId || parts[1] !== user.employeeId || !body.employee) {
@@ -988,6 +1041,25 @@ export async function handleApiRequest(request: Request, parts: string[]) {
       if (body.employee) await upsertEmployee(body.employee);
       if (body.user) await upsertUser(body.user, body.user.password || undefined);
       if (body.payrollRecord) await upsertPayroll(body.payrollRecord);
+      if (body.leaveBalance) {
+        await execute(
+          `INSERT INTO leave_balances (employee_id, casual, sick, privilege, spent_casual, spent_sick, spent_privilege, year_start)
+           VALUES (?,?,?,?,?,?,?,?)
+           ON DUPLICATE KEY UPDATE casual=VALUES(casual), sick=VALUES(sick), privilege=VALUES(privilege),
+             spent_casual=VALUES(spent_casual), spent_sick=VALUES(spent_sick), spent_privilege=VALUES(spent_privilege),
+             year_start=VALUES(year_start)`,
+          [
+            body.leaveBalance.employeeId,
+            body.leaveBalance.casual,
+            body.leaveBalance.sick,
+            body.leaveBalance.privilege,
+            body.leaveBalance.spentCasual ?? 0,
+            body.leaveBalance.spentSick ?? 0,
+            body.leaveBalance.spentPrivilege ?? 0,
+            body.leaveBalance.yearStart || currentLeaveYearStart(),
+          ],
+        );
+      }
       return jsonResponse(200, { ok: true });
     }
 
@@ -1146,10 +1218,34 @@ export async function handleApiRequest(request: Request, parts: string[]) {
         [body.request.status, body.request.reviewedBy, body.request.reviewedAt, body.request.rejectionReason, parts[1]],
       );
       if (body.balance) {
-        await execute(`UPDATE leave_balances SET casual=?, sick=?, privilege=? WHERE employee_id=?`, [
-          body.balance.casual,
-          body.balance.sick,
-          body.balance.privilege,
+        const stored = await query("SELECT * FROM leave_balances WHERE employee_id = ?", [body.balance.employeeId]);
+        const storedYear = stored[0] ? dateOnly(stored[0].year_start) : "";
+        const start = currentLeaveYearStart();
+        let casual = body.balance.casual;
+        let sick = body.balance.sick;
+        let privilege = body.balance.privilege;
+        if (storedYear && storedYear < start) {
+          let nextBalance = defaultLeaveBalance(body.balance.employeeId);
+          const previousRows = await query("SELECT status FROM leave_requests WHERE id = ?", [parts[1]]);
+          const previous = String(previousRows[0]?.status ?? "");
+          const next = body.request.status;
+          if (isInCurrentLeaveYear(body.request.startDate)) {
+            if (previous !== "APPROVED" && next === "APPROVED") {
+              nextBalance = applyLeaveToBalance(nextBalance, body.request, "deduct");
+            }
+            if (previous === "APPROVED" && next !== "APPROVED") {
+              nextBalance = applyLeaveToBalance(nextBalance, body.request, "restore");
+            }
+          }
+          casual = nextBalance.casual;
+          sick = nextBalance.sick;
+          privilege = nextBalance.privilege;
+        }
+        await execute(`UPDATE leave_balances SET casual=?, sick=?, privilege=?, year_start=? WHERE employee_id=?`, [
+          casual,
+          sick,
+          privilege,
+          start,
           body.balance.employeeId,
         ]);
       }
