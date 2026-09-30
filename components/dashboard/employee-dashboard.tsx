@@ -72,11 +72,11 @@ export function EmployeeDashboard({ employee }: { employee: Employee }) {
         actions={<AttendanceActionBar employeeId={employee.id} />}
       />
 
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(300px,26rem)_minmax(0,1fr)]">
-        <Card>
-          <CardContent className="flex flex-col gap-5 p-6">
-            <div className="flex items-start gap-4">
-              <EmployeeAvatar employee={employee} className="size-20 shrink-0" fallbackClassName="text-lg" />
+      <div className="grid items-stretch gap-4 xl:grid-cols-[minmax(300px,26rem)_minmax(0,1fr)]">
+        <Card className="h-full">
+          <CardContent className="flex min-h-0 flex-1 flex-col gap-3">
+            <div className="flex items-start gap-3">
+              <EmployeeAvatar employee={employee} className="size-16 shrink-0" fallbackClassName="text-base" />
               <div className="min-w-0">
                 <p className="truncate text-lg font-semibold">
                   {formatEmployeeDisplayName(employee.fullName, employee.gender)}
@@ -108,14 +108,14 @@ export function EmployeeDashboard({ employee }: { employee: Employee }) {
                 <CalendarDays className="size-3.5 shrink-0" /> Joined {formatDate(employee.joiningDate)}
               </p>
             </div>
-            <div className="mt-auto flex flex-wrap gap-2">
+            <div className="mt-auto flex flex-wrap gap-2 pt-1">
               <LinkButton href="/leave" className="flex-1">Apply leave</LinkButton>
               <LinkButton href="/payroll" variant="outline" className="flex-1">Salary slips</LinkButton>
             </div>
           </CardContent>
         </Card>
 
-        <ChartCard title="Attendance summary" actions={<span className="text-xs text-muted-foreground">Last 7 days</span>} contentClassName="h-[196px]">
+        <ChartCard className="h-full" title="Attendance summary" actions={<span className="text-xs text-muted-foreground">Last 7 days</span>} contentClassName="h-[196px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={dailyHours} barCategoryGap="28%" margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />

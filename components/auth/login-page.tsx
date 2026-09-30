@@ -4,14 +4,15 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, LockKeyhole, ShieldCheck, UserRound } from "lucide-react";
+import { Eye, EyeOff, LockKeyhole, UserRound } from "lucide-react";
 import { GoogleSignInButton, isNativeAndroidApp } from "@/components/auth/google-sign-in-button";
 import { BrandLogo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { APP_NAME, APP_SUBTITLE, COMPANY_NAME, COMPANY_TAGLINE, DEVELOPED_BY, DEVELOPED_BY_URL } from "@/lib/constants";
+import { loginLineForDate, millisecondsUntilNextLocalMidnight } from "@/lib/auth/login-daily-lines";
+import { BASE_PATH, COMPANY_NAME, DEVELOPED_BY, DEVELOPED_BY_URL } from "@/lib/constants";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { loginFormSchema, type LoginFormValues } from "@/lib/validations/login";
 
@@ -24,6 +25,7 @@ export function LoginPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [googleBusy, setGoogleBusy] = useState(false);
   const [appVersionLabel, setAppVersionLabel] = useState<string | null>(null);
+  const [dailyLine, setDailyLine] = useState<string | null>(null);
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: { username: "", password: "" },
@@ -53,6 +55,28 @@ export function LoginPage() {
     return () => window.clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    let midnightTimer = 0;
+    const applyLine = () => setDailyLine(loginLineForDate(new Date()));
+    const scheduleMidnight = () => {
+      window.clearTimeout(midnightTimer);
+      midnightTimer = window.setTimeout(() => {
+        applyLine();
+        scheduleMidnight();
+      }, millisecondsUntilNextLocalMidnight(new Date()) + 1000);
+    };
+    applyLine();
+    scheduleMidnight();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") applyLine();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearTimeout(midnightTimer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
+
   async function onSubmit(values: LoginFormValues) {
     setFormError(null);
     const success = await login(values.username, values.password, rememberMe);
@@ -75,174 +99,128 @@ export function LoginPage() {
     router.replace("/dashboard");
   }
 
+  const fieldClass =
+    "h-11 border-0 bg-transparent px-1 text-foreground shadow-none placeholder:text-muted-foreground focus-visible:border-transparent focus-visible:ring-0";
+
   return (
-    <div className="grid min-h-screen bg-background lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
-      <section className="relative hidden overflow-hidden border-r bg-card lg:flex lg:flex-col">
-        <div className="relative flex flex-1 flex-col justify-between px-12 py-11 xl:px-16">
-          <div className="flex flex-col items-start gap-4">
-            <BrandLogo priority className="h-10 w-auto max-w-[220px] object-contain object-left" />
-            <div className="inline-flex items-center gap-2 rounded-full border bg-muted px-3 py-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-              <ShieldCheck className="size-3.5" />
-              Internal employee portal
+    <div className="relative h-dvh overflow-hidden bg-[#fef7f1] text-[#3d3566]">
+      <div
+        className="absolute inset-0 hidden bg-cover bg-center lg:block"
+        style={{ backgroundImage: `url(${BASE_PATH}/login/welcome-scene.jpg)` }}
+        aria-hidden
+      />
+      <div className="absolute top-5 right-5 z-20 sm:top-6 sm:right-8">
+        <BrandLogo priority className="h-11 w-auto max-w-[220px] object-contain object-right" />
+      </div>
+      <section className="relative z-10 mx-auto flex h-dvh w-full max-w-[420px] flex-col overflow-y-auto px-5 pt-16 pb-5 sm:px-6 lg:mx-0 lg:ml-10 lg:pt-5 xl:ml-16">
+        <div className="my-auto flex w-full flex-col gap-5">
+        <div>
+          <div className="flex w-full min-w-0 flex-col rounded-[28px] border border-border bg-card px-5 py-5 text-card-foreground shadow-none sm:px-6">
+            <h2 className="text-center text-[1.65rem] font-semibold tracking-tight text-foreground">Log in to your account</h2>
+            {dailyLine ? (
+              <p className="mt-2 text-center text-sm leading-6 text-muted-foreground">{dailyLine}</p>
+            ) : null}
+
+            <form className="mt-5 space-y-3" onSubmit={form.handleSubmit(onSubmit)}>
+              <div className="space-y-2">
+                <Label htmlFor="username" className="text-sm font-medium text-foreground">
+                  Username
+                </Label>
+                <div className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-1.5">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <UserRound className="size-4" />
+                  </span>
+                  <Input
+                    id="username"
+                    autoComplete="username"
+                    className={fieldClass}
+                    placeholder="Username or work email"
+                    {...form.register("username")}
+                  />
+                </div>
+                {form.formState.errors.username ? (
+                  <p className="text-xs text-destructive">{form.formState.errors.username.message}</p>
+                ) : null}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-sm font-medium text-foreground">
+                  Password
+                </Label>
+                <div className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-1.5">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <LockKeyhole className="size-4" />
+                  </span>
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    className={fieldClass}
+                    placeholder="Enter your password"
+                    {...form.register("password")}
+                  />
+                  <button
+                    type="button"
+                    suppressHydrationWarning
+                    className="mr-1 rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    onClick={() => setShowPassword((value) => !value)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
+                {form.formState.errors.password ? (
+                  <p className="text-xs text-destructive">{form.formState.errors.password.message}</p>
+                ) : null}
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 pt-0.5">
+                  <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Checkbox checked={rememberMe} onCheckedChange={(value) => setRememberMe(value === true)} />
+                    Remember me
+                  </label>
+                  <span className="text-xs text-primary">Forgot password? Contact admin</span>
+                </div>
+              </div>
+
+              {formError ? (
+                <p className="rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  {formError}
+                </p>
+              ) : null}
+
+              <Button
+                type="submit"
+                className="h-11 w-full text-[15px] font-medium shadow-none"
+                disabled={form.formState.isSubmitting || googleBusy}
+              >
+                Log in
+              </Button>
+            </form>
+
+            <div className="mt-4">
+              <GoogleSignInButton
+                rememberMe={rememberMe}
+                onSuccess={onGoogleCredential}
+                onError={(message) => setFormError(message)}
+              />
             </div>
           </div>
 
-          <div className="max-w-md">
-            <p className="text-[11px] font-semibold tracking-[0.22em] text-primary uppercase">
-              {COMPANY_NAME} · {COMPANY_TAGLINE}
-            </p>
-            <h1 className="mt-3 text-[2.35rem] leading-tight font-semibold tracking-tight text-foreground">
-              {APP_NAME}
-            </h1>
-            <p className="mt-3 text-base leading-7 text-muted-foreground">{APP_SUBTITLE}</p>
-            <p className="mt-5 max-w-sm text-sm leading-6 text-muted-foreground">
-              Sign in to record attendance, request leave, and access workforce records assigned to
-              your role.
-            </p>
-            <div className="mt-8 grid grid-cols-3 gap-3 border-t pt-6">
-              <div>
-                <p className="text-lg font-semibold text-foreground">9h</p>
-                <p className="mt-1 text-[11px] leading-4 text-muted-foreground">Active workday</p>
-              </div>
-              <div>
-                <p className="text-lg font-semibold text-foreground">2</p>
-                <p className="mt-1 text-[11px] leading-4 text-muted-foreground">Access roles</p>
-              </div>
-              <div>
-                <p className="text-lg font-semibold text-foreground">Secure</p>
-                <p className="mt-1 text-[11px] leading-4 text-muted-foreground">Authorized only</p>
-              </div>
-            </div>
-          </div>
+        </div>
 
-          <p className="text-xs text-muted-foreground">
+        <div className="pt-1">
+          {appVersionLabel ? (
+            <p className="mb-2 text-[11px] text-[#8d86a3]">{appVersionLabel}</p>
+          ) : null}
+          <p className="text-xs leading-5 text-[#6d6784]">
             © {new Date().getFullYear()} {COMPANY_NAME}. For authorized personnel only.
             <span className="mt-1 block">
               Developed by{" "}
-              <a href={DEVELOPED_BY_URL} target="_blank" rel="noreferrer" className="hover:text-foreground">
+              <a href={DEVELOPED_BY_URL} target="_blank" rel="noreferrer" className="hover:text-[#3d3566]">
                 {DEVELOPED_BY}
               </a>
             </span>
           </p>
         </div>
-      </section>
-
-      <section className="flex flex-col bg-background">
-        <div className="flex items-center justify-between border-b bg-card px-5 py-4 lg:hidden">
-          <BrandLogo priority className="h-9 w-auto max-w-[200px] object-contain object-left" />
-          <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-            {APP_NAME}
-          </span>
-        </div>
-
-        <div className="flex flex-1 flex-col">
-          <div className="flex flex-1 items-center justify-center px-5 py-10 sm:px-8">
-            <div className="w-full max-w-[420px]">
-              <div className="rounded-xl border bg-card p-7 sm:p-8">
-                <p className="hidden text-[11px] font-semibold tracking-[0.18em] text-primary uppercase lg:block">
-                  {COMPANY_NAME}
-                </p>
-                <h2 className="text-2xl font-semibold tracking-tight text-foreground lg:mt-2">
-                  Sign in
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Enter your credentials to access the HRMS workspace.
-                </p>
-
-                <form className="mt-7 space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
-                  <div className="space-y-2">
-                    <Label htmlFor="username">Username</Label>
-                    <div className="relative">
-                      <UserRound className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-                      <Input
-                        id="username"
-                        autoComplete="username"
-                        className="h-11 rounded-md border-slate-200 bg-white pl-10"
-                        placeholder="Username or work email"
-                        {...form.register("username")}
-                      />
-                    </div>
-                    {form.formState.errors.username ? (
-                      <p className="text-xs text-destructive">{form.formState.errors.username.message}</p>
-                    ) : null}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <div className="relative">
-                      <LockKeyhole className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-                      <Input
-                        id="password"
-                        type={showPassword ? "text" : "password"}
-                        autoComplete="current-password"
-                        className="h-11 rounded-md border-slate-200 bg-white pr-11 pl-10"
-                        placeholder="Password"
-                        {...form.register("password")}
-                      />
-                      <button
-                        type="button"
-                        className="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                        onClick={() => setShowPassword((value) => !value)}
-                        aria-label={showPassword ? "Hide password" : "Show password"}
-                      >
-                        {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                      </button>
-                    </div>
-                    {form.formState.errors.password ? (
-                      <p className="text-xs text-destructive">{form.formState.errors.password.message}</p>
-                    ) : null}
-                  </div>
-
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <label className="flex items-center gap-2 text-sm text-slate-600">
-                      <Checkbox
-                        checked={rememberMe}
-                        onCheckedChange={(value) => setRememberMe(value === true)}
-                      />
-                      Remember me
-                    </label>
-                    <span className="text-xs text-slate-400">Forgot password? Contact admin</span>
-                  </div>
-
-                  {formError ? (
-                    <p className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                      {formError}
-                    </p>
-                  ) : null}
-
-                  <Button
-                    type="submit"
-                    className="h-11 w-full rounded-md"
-                    disabled={form.formState.isSubmitting || googleBusy}
-                  >
-                    Sign in
-                  </Button>
-                </form>
-
-                <div className="mt-5">
-                  <GoogleSignInButton
-                    rememberMe={rememberMe}
-                    onSuccess={onGoogleCredential}
-                    onError={(message) => setFormError(message)}
-                  />
-                </div>
-              </div>
-
-              <p className="mt-6 text-center text-xs leading-5 text-slate-500">
-                Authorized personnel only. If you cannot sign in, contact administration.
-              </p>
-            </div>
-          </div>
-
-          {appVersionLabel ? (
-            <p className="pb-2 text-center text-[11px] text-muted-foreground">{appVersionLabel}</p>
-          ) : null}
-          <p className="pb-5 text-center text-xs text-muted-foreground lg:hidden">
-            Developed by{" "}
-            <a href={DEVELOPED_BY_URL} target="_blank" rel="noreferrer" className="hover:text-foreground">
-              {DEVELOPED_BY}
-            </a>
-          </p>
         </div>
       </section>
     </div>

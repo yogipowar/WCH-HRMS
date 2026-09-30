@@ -38,6 +38,17 @@ export function isNativeAndroidApp() {
   }
 }
 
+function GoogleMark() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-4" aria-hidden>
+      <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.5a5.6 5.6 0 0 1-2.4 3.7v3h3.9c2.3-2.1 3.5-5.2 3.5-8.8z" />
+      <path fill="#34A853" d="M12 24c3.2 0 5.9-1.1 7.9-2.9l-3.9-3c-1.1.7-2.4 1.2-4 1.2-3.1 0-5.7-2.1-6.6-4.9H1.4v3.1A12 12 0 0 0 12 24z" />
+      <path fill="#FBBC05" d="M5.4 14.4A7.2 7.2 0 0 1 5 12c0-.8.1-1.6.4-2.4V6.5H1.4A12 12 0 0 0 0 12c0 1.9.5 3.8 1.4 5.5l4-3.1z" />
+      <path fill="#EA4335" d="M12 4.8c1.7 0 3.3.6 4.5 1.8l3.4-3.4A12 12 0 0 0 1.4 6.5l4 3.1C6.3 6.8 8.9 4.8 12 4.8z" />
+    </svg>
+  );
+}
+
 function startRedirectGoogleSignIn(clientId: string) {
   // APK must use the same GIS flow as the website (JavaScript origin).
   // Opening Google's /o/oauth2/v2/auth causes redirect_uri_mismatch unless that
@@ -116,11 +127,12 @@ export function GoogleSignInButton({
             cancel_on_tap_outside: true,
           });
           buttonRef.current.innerHTML = "";
-          const width = Math.min(360, Math.floor(buttonRef.current.clientWidth || 360));
+          const available = Math.floor(buttonRef.current.clientWidth || 0);
+          const width = Math.min(400, Math.max(240, available || 280));
           window.google.accounts.id.renderButton(buttonRef.current, {
             theme: "outline",
             size: "large",
-            text: "signin_with",
+            text: "continue_with",
             shape: "rectangular",
             width,
             logo_alignment: "left",
@@ -159,10 +171,10 @@ export function GoogleSignInButton({
     <div className="space-y-3">
       <div className="relative py-1">
         <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t" />
+          <span className="w-full border-t border-border" />
         </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+        <div className="relative flex justify-center text-sm">
+          <span className="bg-card px-3 text-muted-foreground">or</span>
         </div>
       </div>
 
@@ -170,7 +182,7 @@ export function GoogleSignInButton({
         <Button
           type="button"
           variant="outline"
-          className="h-11 w-full rounded-md"
+          className="h-12 w-full"
           onClick={() => {
             if (!clientId) {
               onError("Google Sign-In is not configured.");
@@ -179,11 +191,12 @@ export function GoogleSignInButton({
             startRedirectGoogleSignIn(clientId);
           }}
         >
-          Sign in with Google
+          <GoogleMark />
+          Continue with Google
         </Button>
       ) : (
         <>
-          <div ref={buttonRef} className="flex min-h-11 w-full justify-center" />
+          <div ref={buttonRef} className="flex min-h-11 w-full max-w-full justify-center overflow-hidden [&_iframe]:max-w-full" />
           {!ready ? <p className="text-center text-xs text-muted-foreground">Loading Google…</p> : null}
         </>
       )}
