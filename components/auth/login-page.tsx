@@ -109,8 +109,8 @@ export function LoginPage() {
         style={{ backgroundImage: `url(${BASE_PATH}/login/welcome-scene.jpg)` }}
         aria-hidden
       />
-      <div className="absolute top-5 right-5 z-20 sm:top-6 sm:right-8">
-        <BrandLogo priority className="h-11 w-auto max-w-[220px] object-contain object-right" />
+      <div className="absolute top-5 left-5 z-20 sm:top-6 lg:left-auto lg:right-8">
+        <BrandLogo priority className="h-11 w-auto max-w-[220px] object-contain object-left lg:object-right" />
       </div>
       <section className="relative z-10 mx-auto flex h-dvh w-full max-w-[420px] flex-col overflow-y-auto px-5 pt-16 pb-5 sm:px-6 lg:mx-0 lg:ml-10 lg:pt-5 xl:ml-16">
         <div className="my-auto flex w-full flex-col gap-5">

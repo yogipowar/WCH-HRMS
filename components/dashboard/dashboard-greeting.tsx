@@ -26,7 +26,7 @@ export function DashboardGreeting({
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h1 className="text-[1.75rem] font-semibold tracking-tight text-foreground">Hello, {firstName}!</h1>
+        <h1 className="text-[1.75rem] font-semibold tracking-tight text-foreground">Namaste, {firstName}!</h1>
         <p className="mt-1 text-sm text-muted-foreground">{subtitle ?? "We hope you’re having a great day."}</p>
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2 sm:justify-end">{actions}</div> : null}
