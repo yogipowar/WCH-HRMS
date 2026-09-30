@@ -1,5 +1,5 @@
 export const LOGIN_DAILY_LINES = [
-  "Happy to see you again. The admin and your pending tasks are waiting for you. 😉",
+  "Happy to see you again. Rohit sir and your pending tasks are waiting for you. 😉",
   "Happy to see you again. You are the best team member of Web Create Hub. 😅",
   "Welcome back. Your desk missed you. Your tasks missed you more. 😄",
   "Good to see you. The attendance sheet already knows you are here. 😊",
