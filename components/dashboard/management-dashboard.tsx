@@ -7,15 +7,14 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   Legend,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import { Users } from "lucide-react";
+import { FolderKanban, Users } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { ChartCard } from "@/components/charts/chart-card";
 import { DashboardGreeting } from "@/components/dashboard/dashboard-greeting";
@@ -26,6 +25,14 @@ import { LiveAttendanceTable } from "@/components/attendance/live-attendance-tab
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDuration } from "@/lib/attendance/calculations";
+import { entryWorkDate, INTERNAL_OFFICE_ID, INTERNAL_OFFICE_LABEL } from "@/lib/projects/codes";
+import {
+  asProjectStatus,
+  knownRequirementIds,
+  PROJECT_STATUSES,
+  PROJECT_STATUS_COLOR,
+  PROJECT_STATUS_LABELS,
+} from "@/lib/projects/requirements";
 import { isPresentAttendance, isWorkingDay } from "@/lib/attendance/work-calendar";
 import { getEmployeeName, toLiveStatus } from "@/lib/lookups";
 import {
@@ -33,11 +40,11 @@ import {
   departmentAttendance,
   liveAttendanceRows,
   monthlyTrend,
-  weeklyTrend,
 } from "@/lib/reports/aggregations";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { useDataStore } from "@/lib/stores/data-store";
 import { formatDate, leaveTypeLabel } from "@/lib/utils/format";
+import type { Project, ProjectTask, ProjectTaskTimeEntry } from "@/types";
 
 const TODAY = format(new Date(), "yyyy-MM-dd");
 
@@ -45,6 +52,7 @@ export function ManagementDashboard() {
   const user = useAuthStore((state) => state.user);
   const data = useDataStore();
   const [range, setRange] = useState<DateRange | undefined>();
+  const [period, setPeriod] = useState<"today" | "week" | "month" | "custom">("today");
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -84,8 +92,9 @@ export function ManagementDashboard() {
 
   function applyPreset(preset: "today" | "week" | "month") {
     const end = new Date();
+    setPeriod(preset);
     if (preset === "today") {
-      setRange({ from: end, to: end });
+      setRange(undefined);
     } else if (preset === "week") {
       setRange({ from: startOfWeek(end, { weekStartsOn: 1 }), to: end });
     } else {
@@ -93,32 +102,53 @@ export function ManagementDashboard() {
     }
   }
 
+  const rangeFrom = range?.from ? format(range.from, "yyyy-MM-dd") : TODAY;
+  const rangeTo = range?.to ? format(range.to, "yyyy-MM-dd") : rangeFrom;
   const rangeHint = range?.from
     ? `${format(range.from, "dd MMM")} - ${format(range.to ?? range.from, "dd MMM")}`
     : "Today";
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <DashboardGreeting
+      <DashboardGreeting
           name={user?.name ?? "Admin"}
-          subtitle={`Live workforce attendance · showing ${rangeHint}`}
+          subtitle={`Workforce and projects · showing ${rangeHint}`}
+          actions={
+            <>
+              <Button variant={period === "today" ? "default" : "outline"} onClick={() => applyPreset("today")}>Today</Button>
+              <Button variant={period === "week" ? "default" : "outline"} onClick={() => applyPreset("week")}>This week</Button>
+              <Button variant={period === "month" ? "default" : "outline"} onClick={() => applyPreset("month")}>This month</Button>
+              <DateRangePicker
+                value={range}
+                placeholder="Date range"
+                onChange={(value) => {
+                  setRange(value);
+                  setPeriod(value?.from ? "custom" : "today");
+                }}
+              />
+            </>
+          }
         />
-        <div className="flex flex-wrap gap-2">
-          <LinkButton href="/attendance" variant="outline">Live attendance</LinkButton>
-          <Button variant="outline" onClick={() => applyPreset("today")}>Today</Button>
-          <Button variant="outline" onClick={() => applyPreset("week")}>This week</Button>
-          <Button variant="outline" onClick={() => applyPreset("month")}>This month</Button>
-          <DateRangePicker value={range} onChange={setRange} />
-        </div>
-      </div>
 
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-        <SummaryTile label="Present" value={present.length} />
-        <SummaryTile label="Absent" value={absent.length} />
-        <SummaryTile label="Working" value={working.length} />
-        <SummaryTile label="On break" value={lunch.length + personal.length} />
-        <SummaryTile label="Missing punch" value={missing.length} />
+      <div className="grid items-stretch gap-4 lg:grid-cols-2">
+        <Card className="h-full">
+          <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3">
+            <div>
+              <CardTitle className="text-base">Today</CardTitle>
+              <p className="text-xs text-muted-foreground">{format(now, "dd MMMM yyyy")}</p>
+            </div>
+            <LinkButton href="/attendance" size="sm" variant="outline">Live attendance</LinkButton>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <SummaryTile label="Present" value={present.length} />
+            <SummaryTile label="Absent" value={absent.length} />
+            <SummaryTile label="Working" value={working.length} />
+            <SummaryTile label="On break" value={lunch.length + personal.length} />
+            <SummaryTile label="Missing punch" value={missing.length} />
+            <SummaryTile label="Late" value={late.length} />
+          </CardContent>
+        </Card>
+        <ProjectStatusCard projects={data.projects ?? []} />
       </div>
 
       <div className="grid items-stretch gap-4 xl:grid-cols-[minmax(280px,22rem)_minmax(0,1fr)]">
@@ -242,19 +272,14 @@ export function ManagementDashboard() {
       </div>
 
       <div className="grid items-stretch gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(260px,0.65fr)]">
-        <ChartCard className="h-full" title="Weekly attendance trend" contentClassName="h-[200px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={weeklyTrend(data.attendanceRecords, chartEnd)} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-              <YAxis allowDecimals={false} width={28} domain={[0, (max: number) => Math.max(4, Math.ceil(max))]} />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="present" name="Present" stroke="var(--primary)" strokeWidth={2} dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="absent" name="Absent" stroke="var(--destructive)" strokeWidth={2} dot={{ r: 3 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartCard>
+        <ProjectSnapshot
+          projects={data.projects ?? []}
+          tasks={data.projectTasks ?? []}
+          timeEntries={data.projectTaskTimeEntries ?? []}
+          rangeFrom={rangeFrom}
+          rangeTo={rangeTo}
+          rangeHint={rangeHint}
+        />
         <Card className="h-full">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Holidays & announcements</CardTitle>
@@ -367,7 +392,138 @@ export function ManagementDashboard() {
   );
 }
 
-function SummaryTile({ label, value }: { label: string; value: number }) {
+function ProjectStatusCard({ projects }: { projects: Project[] }) {
+  const counts = { UPCOMING: 0, ONGOING: 0, UNDER_TESTING: 0, COMPLETED: 0 };
+  for (const project of projects) counts[asProjectStatus(project.status)] += 1;
+  const total = projects.length;
+
+  return (
+    <Card className="h-full">
+      <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3">
+        <div className="flex items-center gap-2">
+          <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <FolderKanban className="size-4" />
+          </span>
+          <div>
+            <CardTitle className="text-base">Projects</CardTitle>
+            <p className="text-xs text-muted-foreground">{total} total</p>
+          </div>
+        </div>
+        <LinkButton href="/projects" size="sm" variant="outline">Open projects</LinkButton>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex h-2 overflow-hidden rounded-full bg-muted">
+          {total === 0 ? null : PROJECT_STATUSES.map((status) => (
+            <div
+              key={status}
+              className="h-full"
+              style={{
+                width: `${(counts[status] / total) * 100}%`,
+                background: PROJECT_STATUS_COLOR[status],
+              }}
+            />
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {PROJECT_STATUSES.map((status) => (
+            <div key={status} className="flex items-center justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2.5">
+              <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                <span className="size-2 shrink-0 rounded-full" style={{ background: PROJECT_STATUS_COLOR[status] }} />
+                <span className="truncate">{PROJECT_STATUS_LABELS[status]}</span>
+              </span>
+              <span className="text-base font-semibold tabular-nums">{counts[status]}</span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ProjectSnapshot({
+  projects,
+  tasks,
+  timeEntries,
+  rangeFrom,
+  rangeTo,
+  rangeHint,
+}: {
+  projects: Project[];
+  tasks: ProjectTask[];
+  timeEntries: ProjectTaskTimeEntry[];
+  rangeFrom: string;
+  rangeTo: string;
+  rangeHint: string;
+}) {
+  const counts = { UPCOMING: 0, ONGOING: 0, UNDER_TESTING: 0, COMPLETED: 0 };
+  for (const project of projects) counts[asProjectStatus(project.status)] += 1;
+
+  let loggedHours = 0;
+  let internalHours = 0;
+  for (const entry of timeEntries) {
+    const day = entryWorkDate(entry);
+    if (day < rangeFrom || day > rangeTo) continue;
+    if (entry.projectId === INTERNAL_OFFICE_ID) internalHours += entry.hours;
+    else if (entry.projectId) loggedHours += entry.hours;
+  }
+  loggedHours += internalHours;
+
+  const openTasks = tasks.filter((task) => task.status !== "DONE").length;
+  const selectedRequirements = projects.reduce((sum, project) => sum + knownRequirementIds(project.requirementIds ?? []).length, 0);
+  const completedRequirements = projects.reduce((sum, project) => {
+    const selected = new Set(knownRequirementIds(project.requirementIds ?? []));
+    return sum + knownRequirementIds(project.completedRequirementIds ?? []).filter((id) => selected.has(id)).length;
+  }, 0);
+  const statusChart = PROJECT_STATUSES.map((status) => ({
+    label: PROJECT_STATUS_LABELS[status],
+    count: counts[status],
+    fill: PROJECT_STATUS_COLOR[status],
+  }));
+
+  return (
+    <Card className="h-full">
+      <CardHeader className="flex flex-row items-center justify-between gap-3 pb-2">
+        <CardTitle className="text-base">Project snapshot</CardTitle>
+        <span className="text-xs text-muted-foreground">{rangeHint}</span>
+      </CardHeader>
+      <CardContent className="flex flex-1 flex-col gap-4 pt-0">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <SummaryTile label="Logged hours" value={hoursText(loggedHours)} />
+          <SummaryTile label={INTERNAL_OFFICE_LABEL} value={hoursText(internalHours)} />
+          <SummaryTile label="Open tasks" value={openTasks} />
+          <SummaryTile label="Requirements done" value={completedRequirements} />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {selectedRequirements === 0
+            ? "No common requirements selected yet."
+            : `${completedRequirements} of ${selectedRequirements} selected requirements are complete.`}
+        </p>
+        <div className="min-h-[200px] flex-1">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={statusChart} barCategoryGap="28%" margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={0} />
+              <YAxis allowDecimals={false} width={28} />
+              <Tooltip />
+              <Bar dataKey="count" name="Projects" maxBarSize={36} radius={[4, 4, 0, 0]}>
+                {statusChart.map((item) => (
+                  <Cell key={item.label} fill={item.fill} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function hoursText(hours: number) {
+  const rounded = Math.round(hours * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
+function SummaryTile({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="rounded-lg bg-muted/50 px-3 py-2.5">
       <p className="text-xs text-muted-foreground">{label}</p>

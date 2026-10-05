@@ -83,9 +83,9 @@ export function LoginPage() {
 
   async function onSubmit(values: LoginFormValues) {
     setFormError(null);
-    const success = await login(values.username, values.password, rememberMe);
-    if (!success) {
-      setFormError("The username or password is incorrect.");
+    const result = await login(values.username, values.password, rememberMe);
+    if (result !== true) {
+      setFormError(result);
       return;
     }
     router.replace("/dashboard");

@@ -19,6 +19,10 @@ import type {
   Notification,
   PayrollRecord,
   Project,
+  ProjectTask,
+  ProjectTaskComment,
+  ProjectTaskImage,
+  ProjectTaskTimeEntry,
   User,
 } from "@/types";
 import { REQUIRED_DAILY_HOURS } from "@/types";
@@ -41,6 +45,10 @@ export interface AppData {
   documents: EmployeeDocument[];
   payrollRecords: PayrollRecord[];
   projects: Project[];
+  projectTasks: ProjectTask[];
+  projectTaskComments: ProjectTaskComment[];
+  projectTaskTimeEntries: ProjectTaskTimeEntry[];
+  projectTaskImages: ProjectTaskImage[];
   settings: CompanySettings;
 }
 
@@ -556,6 +564,10 @@ export function createSeedData(): AppData {
     documents,
     payrollRecords,
     projects: [],
+    projectTasks: [],
+    projectTaskComments: [],
+    projectTaskTimeEntries: [],
+    projectTaskImages: [],
     settings,
   };
 }

@@ -1,4 +1,4 @@
-import type { Employee, Gender } from "@/types";
+import type { Gender } from "@/types";
 
 export function employeeSalutation(gender: Gender | null | undefined): string {
   if (gender === "MALE") return "Mr.";
@@ -22,7 +22,7 @@ export function defaultAvatarForGender(gender?: Gender | null): string {
 }
 
 export function resolveEmployeeAvatarUrl(
-  employee: Pick<Employee, "avatarUrl" | "gender"> | null | undefined,
+  employee: { avatarUrl?: string | null; gender?: Gender | null } | null | undefined,
 ): string {
   if (employee?.avatarUrl) return employee.avatarUrl;
   return defaultAvatarForGender(employee?.gender);

@@ -1,4 +1,5 @@
 import { getDepartmentName, getEmployeeName } from "@/lib/lookups";
+import { itemCode, projectCode } from "@/lib/projects/codes";
 import { getData } from "@/lib/stores/data-store";
 import type { SearchResult, UserRole } from "@/types";
 
@@ -149,16 +150,34 @@ export function searchApp(query: string, role: UserRole, userId: string): Search
       }
     });
 
-  (data.projects ?? [])
-    .filter((item) => role === "MANAGEMENT" || (employee ? item.projectManagerId === employee.id || item.teamMemberIds.includes(employee.id) : false))
+  const visibleProjects = (data.projects ?? []).filter(
+    (item) => role === "MANAGEMENT" || (employee ? item.projectManagerId === employee.id || item.teamMemberIds.includes(employee.id) : false),
+  );
+  const visibleProjectIds = new Set(visibleProjects.map((item) => item.id));
+  visibleProjects.forEach((item) => {
+    const code = projectCode(item.serialNo);
+    if (`${code} ${item.websiteName} ${item.websiteUrl} ${item.technologyUsed} ${item.remark} ${item.overview ?? ""}`.toLowerCase().includes(q)) {
+      results.push({
+        id: item.id,
+        type: "project",
+        title: item.websiteName,
+        subtitle: code,
+        href: `/projects/${item.id}`,
+      });
+    }
+  });
+  (data.projectTasks ?? [])
+    .filter((item) => visibleProjectIds.has(item.projectId))
     .forEach((item) => {
-      if (`${item.websiteName} ${item.websiteUrl} ${item.technologyUsed} ${item.remark}`.toLowerCase().includes(q)) {
+      const project = visibleProjects.find((projectItem) => projectItem.id === item.projectId);
+      const code = project ? itemCode(project.serialNo, item, data.projectTasks ?? []) : "";
+      if (`${code} ${item.title} ${item.description}`.toLowerCase().includes(q)) {
         results.push({
           id: item.id,
           type: "project",
-          title: item.websiteName,
-          subtitle: `Project #${item.serialNo}`,
-          href: "/projects",
+          title: item.title,
+          subtitle: `${code} · ${item.parentId ? "Subtask" : "Task"} · ${project?.websiteName ?? "Project"}`,
+          href: `/projects/${item.projectId}/tasks/${item.id}`,
         });
       }
     });

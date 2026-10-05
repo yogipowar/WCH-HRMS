@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { formFieldControlClass, formGridClass, formWideClass } from "@/lib/ui/form-styles";
+import { PROJECT_REQUIREMENTS, PROJECT_STATUSES, PROJECT_STATUS_LABELS, knownRequirementIds } from "@/lib/projects/requirements";
 import { projectService } from "@/lib/services/projectService";
 import { useDataStore } from "@/lib/stores/data-store";
 import { projectFormSchema, type ProjectFormValues } from "@/lib/validations/project";
@@ -27,6 +28,8 @@ function emptyValues(serialNo: number): ProjectFormValues {
     technologyUsed: "",
     figmaLink: "",
     remark: "",
+    status: "UPCOMING",
+    requirementIds: [],
     projectManagerId: null,
     teamMemberIds: [],
   };
@@ -42,6 +45,8 @@ function toValues(project: Project): ProjectFormValues {
     technologyUsed: project.technologyUsed,
     figmaLink: project.figmaLink,
     remark: project.remark,
+    status: project.status ?? "UPCOMING",
+    requirementIds: knownRequirementIds(project.requirementIds ?? []),
     projectManagerId: project.projectManagerId,
     teamMemberIds: project.teamMemberIds,
   };
@@ -72,6 +77,7 @@ export function ProjectForm({ project }: { project?: Project }) {
     defaultValues: project ? toValues(project) : emptyValues(projectService.nextSerialNo()),
   });
   const selectedTeamIds = form.watch("teamMemberIds") ?? [];
+  const selectedRequirements = form.watch("requirementIds") ?? [];
   const projectManagerId = form.watch("projectManagerId");
 
   function toggleTeamMember(id: string) {
@@ -79,6 +85,25 @@ export function ProjectForm({ project }: { project?: Project }) {
     form.setValue(
       "teamMemberIds",
       current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+      { shouldDirty: true },
+    );
+  }
+
+  function toggleRequirement(id: string) {
+    const current = form.getValues("requirementIds") ?? [];
+    form.setValue(
+      "requirementIds",
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+      { shouldDirty: true },
+    );
+  }
+
+  const allRequirementsSelected = PROJECT_REQUIREMENTS.every((item) => selectedRequirements.includes(item.id));
+
+  function toggleAllRequirements() {
+    form.setValue(
+      "requirementIds",
+      allRequirementsSelected ? [] : PROJECT_REQUIREMENTS.map((item) => item.id),
       { shouldDirty: true },
     );
   }
@@ -91,8 +116,15 @@ export function ProjectForm({ project }: { project?: Project }) {
       form.setError("serialNo", { message: "This Sr No is already used." });
       return;
     }
+    const requirementIds = knownRequirementIds(values.requirementIds);
     const payload = {
       ...values,
+      overview: project?.overview ?? "",
+      status: values.status,
+      requirementIds,
+      completedRequirementIds: knownRequirementIds(project?.completedRequirementIds ?? []).filter((id) =>
+        requirementIds.includes(id),
+      ),
       websiteUrl: normalizeUrl(values.websiteUrl),
       figmaLink: values.figmaLink.trim() ? normalizeUrl(values.figmaLink) : "",
       projectManagerId: values.projectManagerId || null,
@@ -135,6 +167,15 @@ export function ProjectForm({ project }: { project?: Project }) {
             </Button>
           </div>
         </Field>
+        <Field label="Status">
+          <NativeSelect className={formFieldControlClass} {...form.register("status")}>
+            {PROJECT_STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {PROJECT_STATUS_LABELS[status]}
+              </option>
+            ))}
+          </NativeSelect>
+        </Field>
         <Field label="Technology used" error={form.formState.errors.technologyUsed?.message}>
           <Input placeholder="Next.js, PHP, WordPress..." {...form.register("technologyUsed")} />
         </Field>
@@ -143,6 +184,34 @@ export function ProjectForm({ project }: { project?: Project }) {
         </Field>
         <Field label="Remark" className={formWideClass} error={form.formState.errors.remark?.message}>
           <Textarea rows={3} {...form.register("remark")} />
+        </Field>
+      </Section>
+
+      <Section title="Common requirements">
+        <Field label="Select the requirements for this project" className={formWideClass}>
+          <label className="mb-3 flex items-center gap-2 border-b pb-3 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={allRequirementsSelected}
+              ref={(node) => {
+                if (node) node.indeterminate = selectedRequirements.length > 0 && !allRequirementsSelected;
+              }}
+              onChange={toggleAllRequirements}
+            />
+            <span>Select all</span>
+          </label>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {PROJECT_REQUIREMENTS.map((item) => (
+              <label key={item.id} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={selectedRequirements.includes(item.id)}
+                  onChange={() => toggleRequirement(item.id)}
+                />
+                <span>{item.label}</span>
+              </label>
+            ))}
+          </div>
         </Field>
       </Section>
 

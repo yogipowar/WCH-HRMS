@@ -1,5 +1,5 @@
 import type { AppData } from "@/data/mock-data";
-import type { AttendanceRecord, EmployeeDocument, LateRemovalRequest, LeaveRequest, Notification, User } from "@/types";
+import type { AttendanceRecord, EmployeeDocument, LateRemovalRequest, LeaveRequest, Notification, ProjectTask, ProjectTaskComment, ProjectTaskImage, ProjectTaskTimeEntry, User } from "@/types";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "");
 
@@ -107,6 +107,64 @@ export const api = {
   },
   deleteProject(id: string) {
     return request(`/api/projects/${id}`, { method: "DELETE" });
+  },
+  updateProjectOverview(id: string, overview: string) {
+    return request<{ overview: string; updatedAt: string }>(`/api/projects/${id}/overview`, {
+      method: "PATCH",
+      body: JSON.stringify({ overview }),
+    });
+  },
+  updateProjectStatus(id: string, status: string) {
+    return request<{ status: string; updatedAt: string }>(`/api/projects/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
+  },
+  updateProjectRequirement(id: string, requirementId: string, completed: boolean) {
+    return request<{ completedRequirementIds: string[]; updatedAt: string }>(`/api/projects/${id}/requirements`, {
+      method: "PATCH",
+      body: JSON.stringify({ requirementId, completed }),
+    });
+  },
+  createProjectTask(body: ProjectTask) {
+    return request<ProjectTask>("/api/project-tasks", { method: "POST", body: JSON.stringify(body) });
+  },
+  updateProjectTask(id: string, body: Partial<ProjectTask>) {
+    return request<ProjectTask>(`/api/project-tasks/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+  },
+  deleteProjectTask(id: string) {
+    return request<{ ok: boolean; ids?: string[] }>(`/api/project-tasks/${id}`, { method: "DELETE" });
+  },
+  createProjectTaskComment(body: ProjectTaskComment) {
+    return request<ProjectTaskComment>("/api/project-task-comments", { method: "POST", body: JSON.stringify(body) });
+  },
+  createProjectTaskTime(body: ProjectTaskTimeEntry) {
+    return request<ProjectTaskTimeEntry>("/api/project-task-time", { method: "POST", body: JSON.stringify(body) });
+  },
+  deleteProjectTaskTime(id: string) {
+    return request<{ ok: boolean; id: string }>(`/api/project-task-time/${id}`, { method: "DELETE" });
+  },
+  createProjectTaskImage(body: {
+    id: string;
+    taskId: string;
+    commentId: string | null;
+    fileName: string;
+    mimeType: string;
+    dataBase64: string;
+  }) {
+    return request<ProjectTaskImage>("/api/project-task-images", { method: "POST", body: JSON.stringify(body) });
+  },
+  async fetchProjectTaskImage(id: string) {
+    const headers = new Headers();
+    if (memoryToken) headers.set("Authorization", `Bearer ${memoryToken}`);
+    const response = await fetch(`${API_URL}/api/project-task-images/${id}`, {
+      credentials: "include",
+      headers,
+    });
+    if (!response.ok) {
+      throw new ApiError("Could not load the image.", response.status);
+    }
+    return response.blob();
   },
   createLeave(body: FormData) {
     return request<LeaveRequest>("/api/leave", { method: "POST", body });

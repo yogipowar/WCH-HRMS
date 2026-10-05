@@ -1,5 +1,6 @@
 import dns from "node:dns/promises";
 import fs from "node:fs";
+import net from "node:net";
 import path from "node:path";
 import mysql, { type Pool, type PoolOptions, type ResultSetHeader, type RowDataPacket } from "mysql2/promise";
 
@@ -33,37 +34,87 @@ export function dbConfig(): PoolOptions {
   };
 }
 
-async function resolveDbHost(host: string) {
+function tcpOpen(host: string, port: number, timeoutMs: number) {
+  return new Promise<boolean>((resolve) => {
+    const socket = net.connect({ host, port, family: host.includes(":") ? 6 : 4 });
+    const timer = setTimeout(() => {
+      socket.destroy();
+      resolve(false);
+    }, timeoutMs);
+    socket.once("connect", () => {
+      clearTimeout(timer);
+      socket.end();
+      resolve(true);
+    });
+    socket.once("error", () => {
+      clearTimeout(timer);
+      resolve(false);
+    });
+  });
+}
+
+async function ipv6ForName(name: string) {
+  try {
+    const records = await dns.lookup(name, { all: true });
+    return records.find((record) => record.family === 6)?.address ?? "";
+  } catch {
+    return "";
+  }
+}
+
+async function resolveDbHost(host: string, port: number) {
   if (!host || host === "localhost" || host === "127.0.0.1" || host === "::1") {
     return host;
   }
-  try {
-    const { address } = await dns.lookup(host, { family: 4 });
-    return address;
-  } catch {
-    return host;
+  const ipv6 = await ipv6ForName(host);
+  if (ipv6) return ipv6;
+  // An IPv4 literal, or a name with no IPv6 record. The Hostinger IPv4 address
+  // drops packets from outside the network, so use the hostname's IPv6 when it
+  // matches this address.
+  const candidate = host;
+  if (!(await tcpOpen(candidate, port, 2000))) {
+    const hostname = "srv1750.hstgr.io";
+    try {
+      const addresses = await dns.resolve4(hostname);
+      if (addresses.includes(candidate)) {
+        const fallback = await ipv6ForName(hostname);
+        if (fallback) return fallback;
+      }
+    } catch {
+      // Keep the configured host.
+    }
   }
+  return candidate;
 }
 
 function isTransientDbError(error: unknown) {
   if (!error || typeof error !== "object") return false;
   const code = "code" in error ? String(error.code) : "";
   const message = error instanceof Error ? error.message : "";
-  return TRANSIENT_DB_CODES.has(code) || message.includes("ENOTFOUND") || message.includes("EAI_AGAIN");
+  return (
+    TRANSIENT_DB_CODES.has(code) ||
+    message.includes("ENOTFOUND") ||
+    message.includes("EAI_AGAIN") ||
+    message.includes("ETIMEDOUT") ||
+    message.includes("Pool is closed")
+  );
 }
 
 let pool: Pool | null = null;
+let poolHost = "";
 let schemaReady = false;
 
 async function resetPool() {
   const current = pool;
   pool = null;
+  poolHost = "";
   schemaReady = false;
   documentColumnsReady = false;
   leaveColumnsReady = false;
   lateRemovalTableReady = false;
   employeeScheduleColumnsReady = false;
   projectsTableReady = false;
+  projectWorkTablesReady = false;
   passwordPlainColumnReady = false;
   if (current) {
     await current.end().catch(() => undefined);
@@ -75,10 +126,15 @@ export async function getPool(): Promise<Pool> {
   if (!config.password) {
     throw new Error("DB_PASSWORD is required.");
   }
+  const host = await resolveDbHost(String(config.host || "localhost"), Number(config.port || 3306));
+  if (pool && poolHost !== host) {
+    await resetPool();
+  }
   if (!pool) {
+    poolHost = host;
     pool = mysql.createPool({
       ...config,
-      host: await resolveDbHost(String(config.host || "localhost")),
+      host,
     });
   }
   if (!schemaReady) {
@@ -191,9 +247,10 @@ export async function ensureEmployeeScheduleColumns(db?: Pool) {
 }
 
 let projectsTableReady = false;
+let projectWorkTablesReady = false;
 
 export async function ensureProjectsTable(db?: Pool) {
-  if (projectsTableReady) return;
+  if (projectsTableReady && projectWorkTablesReady) return;
   const pool = db ?? (await getPool());
   await pool.query(`
     CREATE TABLE IF NOT EXISTS projects (
@@ -206,6 +263,10 @@ export async function ensureProjectsTable(db?: Pool) {
       technology_used TEXT NOT NULL,
       figma_link TEXT NOT NULL,
       remark TEXT NOT NULL,
+      overview TEXT NULL,
+      status VARCHAR(32) NOT NULL DEFAULT 'UPCOMING',
+      requirement_ids LONGTEXT NULL,
+      completed_requirement_ids LONGTEXT NULL,
       project_manager_id VARCHAR(64) NULL,
       team_member_ids LONGTEXT NOT NULL,
       created_at VARCHAR(64) NOT NULL,
@@ -213,7 +274,144 @@ export async function ensureProjectsTable(db?: Pool) {
       UNIQUE KEY projects_serial_no (serial_no)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+  const [columns] = await pool.query<RowDataPacket[]>(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'projects'`,
+  );
+  const names = new Set(columns.map((row) => String(row.COLUMN_NAME)));
+  if (!names.has("overview")) {
+    await pool.query("ALTER TABLE projects ADD COLUMN overview TEXT NULL");
+  }
+  if (!names.has("status")) {
+    await pool.query("ALTER TABLE projects ADD COLUMN status VARCHAR(32) NOT NULL DEFAULT 'UPCOMING'");
+    await pool.query("UPDATE projects SET status = 'ONGOING'");
+  }
+  if (!names.has("requirement_ids")) {
+    await pool.query("ALTER TABLE projects ADD COLUMN requirement_ids LONGTEXT NULL");
+  }
+  if (!names.has("completed_requirement_ids")) {
+    await pool.query("ALTER TABLE projects ADD COLUMN completed_requirement_ids LONGTEXT NULL");
+  }
   projectsTableReady = true;
+  if (projectWorkTablesReady) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS project_tasks (
+      id VARCHAR(64) PRIMARY KEY,
+      project_id VARCHAR(64) NOT NULL,
+      parent_id VARCHAR(64) NULL,
+      title VARCHAR(255) NOT NULL,
+      description TEXT NOT NULL,
+      status VARCHAR(32) NOT NULL,
+      priority VARCHAR(16) NOT NULL DEFAULT 'MEDIUM',
+      assignee_id VARCHAR(64) NULL,
+      start_date DATE NULL,
+      end_date DATE NULL,
+      duration_hours DECIMAL(8,2) NOT NULL DEFAULT 0,
+      sort_order INT NOT NULL DEFAULT 0,
+      created_by VARCHAR(64) NOT NULL,
+      created_at VARCHAR(64) NOT NULL,
+      updated_at VARCHAR(64) NOT NULL,
+      KEY project_tasks_project (project_id),
+      KEY project_tasks_parent (parent_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS project_task_comments (
+      id VARCHAR(64) PRIMARY KEY,
+      task_id VARCHAR(64) NOT NULL,
+      author_id VARCHAR(64) NOT NULL,
+      body TEXT NOT NULL,
+      created_at VARCHAR(64) NOT NULL,
+      KEY project_task_comments_task (task_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS project_task_time (
+      id VARCHAR(64) PRIMARY KEY,
+      task_id VARCHAR(64) NOT NULL,
+      employee_id VARCHAR(64) NOT NULL,
+      hours DECIMAL(8,2) NOT NULL,
+      note VARCHAR(500) NOT NULL DEFAULT '',
+      created_at VARCHAR(64) NOT NULL,
+      KEY project_task_time_task (task_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS project_task_images (
+      id VARCHAR(64) PRIMARY KEY,
+      task_id VARCHAR(64) NOT NULL,
+      comment_id VARCHAR(64) NULL,
+      file_name VARCHAR(255) NOT NULL,
+      mime_type VARCHAR(128) NOT NULL,
+      file_data LONGBLOB NOT NULL,
+      uploaded_by VARCHAR(64) NOT NULL,
+      created_at VARCHAR(64) NOT NULL,
+      KEY project_task_images_task (task_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  const [taskColumns] = await pool.query<RowDataPacket[]>(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'project_tasks'`,
+  );
+  const taskNames = new Set(taskColumns.map((row) => String(row.COLUMN_NAME)));
+  if (!taskNames.has("assignee_ids")) {
+    await pool.query("ALTER TABLE project_tasks ADD COLUMN assignee_ids LONGTEXT NULL");
+    await pool.query(
+      `UPDATE project_tasks
+       SET assignee_ids = JSON_ARRAY(assignee_id)
+       WHERE assignee_id IS NOT NULL AND assignee_id <> ''`,
+    );
+  }
+  if (!taskNames.has("task_no")) {
+    await pool.query("ALTER TABLE project_tasks ADD COLUMN task_no INT NOT NULL DEFAULT 0");
+  }
+  const [unnumbered] = await pool.query<RowDataPacket[]>(
+    "SELECT id, project_id, parent_id FROM project_tasks WHERE task_no = 0 ORDER BY created_at ASC, id ASC",
+  );
+  if (unnumbered.length > 0) {
+    const [maxRows] = await pool.query<RowDataPacket[]>(
+      `SELECT project_id, parent_id, MAX(task_no) AS max_no
+       FROM project_tasks
+       WHERE task_no > 0
+       GROUP BY project_id, parent_id`,
+    );
+    const maxes = new Map<string, number>();
+    for (const row of maxRows) {
+      maxes.set(`${row.project_id}\0${row.parent_id ?? ""}`, Number(row.max_no) || 0);
+    }
+    for (const row of unnumbered) {
+      const key = `${row.project_id}\0${row.parent_id ?? ""}`;
+      const next = (maxes.get(key) ?? 0) + 1;
+      maxes.set(key, next);
+      await pool.query("UPDATE project_tasks SET task_no = ? WHERE id = ? AND task_no = 0", [next, row.id]);
+    }
+  }
+  const [timeColumns] = await pool.query<RowDataPacket[]>(
+    `SELECT COLUMN_NAME, IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'project_task_time'`,
+  );
+  const timeMeta = new Map(timeColumns.map((row) => [String(row.COLUMN_NAME), String(row.IS_NULLABLE)]));
+  if (!timeMeta.has("work_date")) {
+    await pool.query("ALTER TABLE project_task_time ADD COLUMN work_date DATE NULL");
+  }
+  await pool.query(
+    `UPDATE project_task_time
+     SET work_date = LEFT(created_at, 10)
+     WHERE work_date IS NULL AND created_at REGEXP '^[0-9]{4}-[0-9]{2}-[0-9]{2}'`,
+  );
+  if (!timeMeta.has("project_id")) {
+    await pool.query("ALTER TABLE project_task_time ADD COLUMN project_id VARCHAR(64) NULL");
+  }
+  await pool.query(
+    `UPDATE project_task_time t
+     INNER JOIN project_tasks k ON k.id = t.task_id
+     SET t.project_id = k.project_id
+     WHERE t.project_id IS NULL AND t.task_id IS NOT NULL`,
+  );
+  if (timeMeta.get("task_id") === "NO") {
+    await pool.query("ALTER TABLE project_task_time MODIFY task_id VARCHAR(64) NULL");
+  }
+  projectWorkTablesReady = true;
 }
 
 let passwordPlainColumnReady = false;

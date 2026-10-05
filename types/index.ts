@@ -1,3 +1,5 @@
+import type { ProjectStatus } from "@/lib/projects/requirements";
+
 export const USER_ROLES = ["MANAGEMENT", "EMPLOYEE"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
@@ -306,10 +308,91 @@ export interface Project {
   technologyUsed: string;
   figmaLink: string;
   remark: string;
+  /** Scope and overview written by the project manager or a team member. */
+  overview: string;
+  /** Upcoming, ongoing, under testing, or completed. */
+  status: ProjectStatus;
+  /** Common requirements selected for this project. */
+  requirementIds: string[];
+  /** Selected requirements the team has marked complete. */
+  completedRequirementIds: string[];
   projectManagerId: string | null;
   teamMemberIds: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+export const TASK_STATUSES = ["TODO", "IN_PROGRESS", "IN_REVIEW", "REOPEN", "DONE"] as const;
+export type TaskStatus = (typeof TASK_STATUSES)[number];
+
+export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  TODO: "To do",
+  IN_PROGRESS: "In progress",
+  IN_REVIEW: "In review",
+  REOPEN: "Reopen",
+  DONE: "Done",
+};
+
+export const TASK_PRIORITIES = ["LOW", "MEDIUM", "HIGH"] as const;
+export type TaskPriority = (typeof TASK_PRIORITIES)[number];
+
+export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
+  LOW: "Low",
+  MEDIUM: "Medium",
+  HIGH: "High",
+};
+
+export interface ProjectTask {
+  id: string;
+  projectId: string;
+  /** Null for a main task. A subtask points at a main task. */
+  parentId: string | null;
+  title: string;
+  description: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  /** Project manager and team members working on this task. */
+  assigneeIds: string[];
+  startDate: string | null;
+  endDate: string | null;
+  /** Planned effort. Spent time is stored separately as time entries. */
+  durationHours: number;
+  /** Stable number within the project, or within the parent task for a subtask. */
+  taskNo: number;
+  sortOrder: number;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectTaskComment {
+  id: string;
+  taskId: string;
+  authorId: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface ProjectTaskTimeEntry {
+  id: string;
+  taskId: string | null;
+  projectId: string;
+  employeeId: string;
+  hours: number;
+  note: string;
+  /** Calendar day the work was done, yyyy-MM-dd. */
+  workDate: string;
+  createdAt: string;
+}
+
+export interface ProjectTaskImage {
+  id: string;
+  taskId: string;
+  commentId: string | null;
+  fileName: string;
+  mimeType: string;
+  uploadedBy: string;
+  createdAt: string;
 }
 
 export interface Notification {

@@ -4,6 +4,9 @@ import { settings as defaultSettings } from "@/data/mock-data";
 import type { AppData } from "@/data/mock-data";
 import { createId } from "@/lib/lookups";
 import { ensureDocumentFileColumns, ensureEmployeeScheduleColumns, ensureLateRemovalTable, ensureLeaveAttachmentColumns, ensureLeaveBalanceYearColumn, ensurePasswordPlainColumn, ensureProjectsTable, execute, query } from "@/lib/server/db";
+import { INTERNAL_OFFICE_ID } from "@/lib/projects/codes";
+import { asProjectStatus, knownRequirementIds } from "@/lib/projects/requirements";
+import { deleteProjectWork, handleProjectWorkRequest, mapProjectTask, mapProjectTaskComment, mapProjectTaskImage, mapProjectTaskTime } from "@/lib/server/project-work";
 import { clearTokenCookie, signToken, tokenCookie, tokenFromRequest, verifyToken } from "@/lib/server/auth";
 import { isGoogleSignInConfigured, verifyGoogleIdToken } from "@/lib/server/google-auth";
 import { createGoogleHandoff, takeGoogleHandoff } from "@/lib/server/google-handoff";
@@ -62,8 +65,12 @@ function publicDbError(error: unknown) {
   if (
     code === "ENOTFOUND" ||
     code === "EAI_AGAIN" ||
+    code === "ETIMEDOUT" ||
+    code === "ECONNREFUSED" ||
     message.includes("ENOTFOUND") ||
-    message.includes("EAI_AGAIN")
+    message.includes("EAI_AGAIN") ||
+    message.includes("ETIMEDOUT") ||
+    message.includes("ECONNREFUSED")
   ) {
     return "Could not reach the database. Please try again.";
   }
@@ -215,6 +222,7 @@ function mapHoliday(row: RowDataPacket): Holiday {
 }
 
 function mapProject(row: RowDataPacket): Project {
+  const requirementIds = knownRequirementIds(parseJson<string[]>(row.requirement_ids, []));
   return {
     id: row.id,
     serialNo: number(row.serial_no),
@@ -225,6 +233,12 @@ function mapProject(row: RowDataPacket): Project {
     technologyUsed: String(row.technology_used ?? ""),
     figmaLink: String(row.figma_link ?? ""),
     remark: String(row.remark ?? ""),
+    overview: String(row.overview ?? ""),
+    status: asProjectStatus(row.status),
+    requirementIds,
+    completedRequirementIds: knownRequirementIds(parseJson<string[]>(row.completed_requirement_ids, [])).filter((id) =>
+      requirementIds.includes(id),
+    ),
     projectManagerId: row.project_manager_id ? String(row.project_manager_id) : null,
     teamMemberIds: parseJson<string[]>(row.team_member_ids, []),
     createdAt: String(row.created_at ?? ""),
@@ -315,7 +329,13 @@ async function alignLeaveBalancesToYear(rows: RowDataPacket[]) {
   }
 }
 
-export async function loadBootstrap(includePasswords = false): Promise<AppData> {
+function isOnProject(project: Project, employeeId: string | null) {
+  if (!employeeId) return false;
+  if (project.projectManagerId === employeeId) return true;
+  return project.teamMemberIds.includes(employeeId);
+}
+
+export async function loadBootstrap(includePasswords = false, viewerEmployeeId: string | null = null): Promise<AppData> {
   await ensureDocumentFileColumns();
   await ensureLeaveAttachmentColumns();
   await ensureLateRemovalTable();
@@ -338,6 +358,10 @@ export async function loadBootstrap(includePasswords = false): Promise<AppData> 
     documents,
     payrollRecords,
     projects,
+    projectTasks,
+    projectTaskComments,
+    projectTaskTime,
+    projectTaskImages,
     settingsRows,
   ] = await Promise.all([
     query("SELECT * FROM users"),
@@ -364,10 +388,29 @@ export async function loadBootstrap(includePasswords = false): Promise<AppData> 
     ),
     query("SELECT * FROM payroll_records"),
     query("SELECT * FROM projects ORDER BY serial_no ASC"),
+    query("SELECT * FROM project_tasks ORDER BY sort_order ASC, created_at ASC"),
+    query("SELECT * FROM project_task_comments ORDER BY created_at ASC"),
+    query("SELECT * FROM project_task_time ORDER BY created_at ASC"),
+    query(
+      `SELECT id, task_id, comment_id, file_name, mime_type, uploaded_by, created_at
+       FROM project_task_images
+       ORDER BY created_at ASC`,
+    ),
     query("SELECT payload FROM settings WHERE id = 1"),
   ]);
 
   await alignLeaveBalancesToYear(leaveBalances);
+
+  const mappedProjects = projects.map(mapProject).map((project) =>
+    includePasswords || isOnProject(project, viewerEmployeeId) ? project : { ...project, overview: "" },
+  );
+  const visibleProjectIds = new Set(
+    mappedProjects
+      .filter((project) => includePasswords || isOnProject(project, viewerEmployeeId))
+      .map((project) => project.id),
+  );
+  const mappedTasks = (projectTasks as RowDataPacket[]).map(mapProjectTask).filter((task) => visibleProjectIds.has(task.projectId));
+  const visibleTaskIds = new Set(mappedTasks.map((task) => task.id));
 
   return {
     users: users.map((row) => publicUser(row, includePasswords)),
@@ -404,7 +447,22 @@ export async function loadBootstrap(includePasswords = false): Promise<AppData> 
     announcements: announcements.map(mapAnnouncement),
     documents: documents.map(mapDocument),
     payrollRecords: payrollRecords.map(mapPayroll),
-    projects: projects.map(mapProject),
+    projects: mappedProjects,
+    projectTasks: mappedTasks,
+    projectTaskComments: (projectTaskComments as RowDataPacket[])
+      .map(mapProjectTaskComment)
+      .filter((item) => visibleTaskIds.has(item.taskId)),
+    projectTaskTimeEntries: (projectTaskTime as RowDataPacket[])
+      .map(mapProjectTaskTime)
+      .filter((item) => {
+        if (item.projectId === INTERNAL_OFFICE_ID) {
+          return includePasswords || (viewerEmployeeId != null && item.employeeId === viewerEmployeeId);
+        }
+        return item.taskId ? visibleTaskIds.has(item.taskId) : visibleProjectIds.has(item.projectId);
+      }),
+    projectTaskImages: (projectTaskImages as RowDataPacket[])
+      .map(mapProjectTaskImage)
+      .filter((item) => visibleTaskIds.has(item.taskId)),
     settings: parseJson<CompanySettings>(settingsRows[0]?.payload, defaultSettings),
   };
 }
@@ -951,6 +1009,9 @@ export async function handleApiRequest(request: Request, parts: string[]) {
       return jsonResponse(401, { error: "Unauthorized" });
     }
 
+    const projectWork = await handleProjectWorkRequest(request, parts, user);
+    if (projectWork) return projectWork;
+
     if (parts[0] === "auth" && parts[1] === "me" && request.method === "GET") {
       return jsonResponse(200, { user });
     }
@@ -966,7 +1027,7 @@ export async function handleApiRequest(request: Request, parts: string[]) {
     }
 
     if (parts[0] === "bootstrap" && request.method === "GET") {
-      const data = await loadBootstrap(user.role === "MANAGEMENT");
+      const data = await loadBootstrap(user.role === "MANAGEMENT", user.employeeId);
       if (user.role !== "MANAGEMENT") {
         data.payrollRecords = data.payrollRecords.filter(
           (item) => item.employeeId === user.employeeId && isPayslipReleased(item),
@@ -1141,11 +1202,13 @@ export async function handleApiRequest(request: Request, parts: string[]) {
       }
       await ensureProjectsTable();
       const item = (await request.json()) as Project;
+      const requirementIds = knownRequirementIds(item.requirementIds ?? []);
       await execute(
         `INSERT INTO projects (
           id, serial_no, website_name, website_url, login_username, login_password,
-          technology_used, figma_link, remark, project_manager_id, team_member_ids, created_at, updated_at
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          technology_used, figma_link, remark, project_manager_id, team_member_ids,
+          status, requirement_ids, completed_requirement_ids, created_at, updated_at
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
           item.id,
           item.serialNo,
@@ -1158,6 +1221,9 @@ export async function handleApiRequest(request: Request, parts: string[]) {
           item.remark,
           item.projectManagerId,
           json(item.teamMemberIds ?? []),
+          asProjectStatus(item.status),
+          json(requirementIds),
+          json([]),
           item.createdAt,
           item.updatedAt,
         ],
@@ -1171,10 +1237,15 @@ export async function handleApiRequest(request: Request, parts: string[]) {
       }
       await ensureProjectsTable();
       const item = (await request.json()) as Project;
+      const requirementIds = knownRequirementIds(item.requirementIds ?? []);
+      const completedRequirementIds = knownRequirementIds(item.completedRequirementIds ?? []).filter((id) =>
+        requirementIds.includes(id),
+      );
       await execute(
         `UPDATE projects SET
           serial_no=?, website_name=?, website_url=?, login_username=?, login_password=?,
-          technology_used=?, figma_link=?, remark=?, project_manager_id=?, team_member_ids=?, updated_at=?
+          technology_used=?, figma_link=?, remark=?, project_manager_id=?, team_member_ids=?,
+          status=?, requirement_ids=?, completed_requirement_ids=?, updated_at=?
          WHERE id=?`,
         [
           item.serialNo,
@@ -1187,6 +1258,9 @@ export async function handleApiRequest(request: Request, parts: string[]) {
           item.remark,
           item.projectManagerId,
           json(item.teamMemberIds ?? []),
+          asProjectStatus(item.status),
+          json(requirementIds),
+          json(completedRequirementIds),
           item.updatedAt,
           parts[1],
         ],
@@ -1199,6 +1273,7 @@ export async function handleApiRequest(request: Request, parts: string[]) {
         return jsonResponse(403, { error: "Only administrators can delete projects." });
       }
       await ensureProjectsTable();
+      await deleteProjectWork(parts[1]);
       await execute("DELETE FROM projects WHERE id = ?", [parts[1]]);
       return jsonResponse(200, { ok: true });
     }

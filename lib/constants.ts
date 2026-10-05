@@ -44,6 +44,7 @@ export const MANAGEMENT_NAV: AppNavItem[] = [
   { title: "Departments", href: "/departments", icon: "Building2", section: "People" },
   { title: "Designations", href: "/designations", icon: "Briefcase", section: "People" },
   { title: "Attendance", href: "/attendance", icon: "Clock3", section: "Time" },
+  { title: "Timesheet", href: "/timesheet", icon: "ClipboardList", section: "Time" },
   { title: "Leave", href: "/leave", icon: "CalendarDays", section: "Time" },
   { title: "Holidays", href: "/holidays", icon: "Palmtree", section: "Time" },
   { title: "Reports", href: "/reports", icon: "BarChart3", section: "Insights" },
@@ -61,6 +62,7 @@ export const EMPLOYEE_NAV: AppNavItem[] = [
   { title: "My Leaves", href: "/leave", icon: "CalendarDays" },
   { title: "Holidays", href: "/holidays", icon: "Palmtree" },
   { title: "My Projects", href: "/projects", icon: "FolderKanban" },
+  { title: "Timesheet", href: "/timesheet", icon: "ClipboardList" },
   { title: "Team", href: "/team", icon: "Users" },
   { title: "Announcements", href: "/announcements", icon: "Megaphone" },
   { title: "Documents", href: "/documents", icon: "FileText" },
@@ -80,6 +82,7 @@ export const EMPLOYEE_MOBILE_MORE_SECTIONS: { title: string; items: AppNavItem[]
   {
     title: "Workplace",
     items: [
+      { title: "Timesheet", href: "/timesheet", icon: "ClipboardList" },
       { title: "Team", href: "/team", icon: "Users" },
       { title: "Holidays", href: "/holidays", icon: "Palmtree" },
       { title: "Announcements", href: "/announcements", icon: "Megaphone" },
@@ -124,6 +127,7 @@ export const MANAGEMENT_MOBILE_MORE_SECTIONS: { title: string; items: AppNavItem
   {
     title: "Time & insights",
     items: [
+      { title: "Timesheet", href: "/timesheet", icon: "ClipboardList" },
       { title: "Holidays", href: "/holidays", icon: "Palmtree" },
       { title: "Reports", href: "/reports", icon: "BarChart3" },
     ],

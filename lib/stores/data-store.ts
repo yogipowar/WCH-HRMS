@@ -41,6 +41,10 @@ export const useDataStore = create<DataStore>()((set) => ({
       leaveBalances: [...leaveBalanceByEmployee.values()],
       lateRemovalRequests: data.lateRemovalRequests ?? [],
       projects: data.projects ?? [],
+      projectTasks: data.projectTasks ?? [],
+      projectTaskComments: data.projectTaskComments ?? [],
+      projectTaskTimeEntries: data.projectTaskTimeEntries ?? [],
+      projectTaskImages: data.projectTaskImages ?? [],
       ready: true,
     });
   },
@@ -65,6 +69,10 @@ export function getData(): AppData {
     documents: state.documents,
     payrollRecords: state.payrollRecords,
     projects: state.projects ?? [],
+    projectTasks: state.projectTasks ?? [],
+    projectTaskComments: state.projectTaskComments ?? [],
+    projectTaskTimeEntries: state.projectTaskTimeEntries ?? [],
+    projectTaskImages: state.projectTaskImages ?? [],
     settings: state.settings,
   };
 }

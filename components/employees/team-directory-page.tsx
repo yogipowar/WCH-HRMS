@@ -100,22 +100,8 @@ export function TeamDirectoryPage() {
     <div className="space-y-6">
       <PageHeader
         title="Team"
-        description="Your Web Create Hub teammates. Salary and payroll details are not shown here."
+        description="Your Web Create Hub teammates."
       />
-      <div className="flex flex-wrap gap-3">
-        <select
-          className="h-10 rounded-lg border border-input bg-background px-3 text-sm"
-          value={departmentId}
-          onChange={(event) => setDepartmentId(event.target.value)}
-        >
-          <option value="all">All departments</option>
-          {data.departments.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-        </select>
-      </div>
       <DataTable
         data={employees}
         columns={columns}
@@ -123,6 +109,20 @@ export function TeamDirectoryPage() {
         searchPlaceholder="Search team..."
         searchFilter={(row, query) =>
           `${row.fullName} ${row.workEmail} ${row.employeeCode} ${row.phone}`.toLowerCase().includes(query)
+        }
+        toolbar={
+          <select
+            className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground"
+            value={departmentId}
+            onChange={(event) => setDepartmentId(event.target.value)}
+          >
+            <option value="all">All departments</option>
+            {data.departments.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
         }
       />
     </div>

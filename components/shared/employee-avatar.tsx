@@ -9,7 +9,7 @@ import { initials } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import type { Employee, Gender } from "@/types";
 
-type AvatarEmployee = Pick<Employee, "fullName" | "avatarUrl" | "gender">;
+type AvatarEmployee = Pick<Employee, "fullName" | "avatarUrl"> & { gender?: Gender | null };
 
 export function EmployeeAvatar({
   employee,

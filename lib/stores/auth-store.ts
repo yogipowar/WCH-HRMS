@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { api, setApiToken } from "@/lib/api/client";
+import { ApiError, api, setApiToken } from "@/lib/api/client";
 import { useDataStore } from "@/lib/stores/data-store";
 import type { User } from "@/types";
 
@@ -9,7 +9,7 @@ interface AuthStore {
   user: User | null;
   isAuthenticated: boolean;
   status: "idle" | "loading" | "ready";
-  login: (username: string, password: string, remember?: boolean) => Promise<boolean>;
+  login: (username: string, password: string, remember?: boolean) => Promise<true | string>;
   loginWithGoogle: (credential: string, remember?: boolean) => Promise<{ ok: boolean; error?: string }>;
   logout: () => Promise<void>;
   restore: () => Promise<void>;
@@ -25,9 +25,10 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
       const { user, token } = await api.login(username, password, remember);
       setApiToken(token);
       set({ user, isAuthenticated: true, status: "ready" });
-    } catch {
+    } catch (error) {
       set({ user: null, isAuthenticated: false, status: "ready" });
-      return false;
+      if (error instanceof ApiError && error.status !== 401 && error.message) return error.message;
+      return "The username or password is incorrect.";
     }
     try {
       await useDataStore.getState().hydrateFromApi();
