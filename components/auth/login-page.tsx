@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { loginLineForDate, millisecondsUntilNextLocalMidnight } from "@/lib/auth/login-daily-lines";
-import { BASE_PATH, COMPANY_NAME, DEVELOPED_BY, DEVELOPED_BY_URL } from "@/lib/constants";
+import { AGENCY, APP_NAME, APP_SUBTITLE, COMPANY_NAME, COMPANY_TAGLINE, DEVELOPED_BY, DEVELOPED_BY_URL } from "@/lib/constants";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { loginFormSchema, type LoginFormValues } from "@/lib/validations/login";
 
@@ -107,22 +107,42 @@ export function LoginPage() {
     "h-11 border-0 bg-transparent px-1 text-foreground shadow-none placeholder:text-muted-foreground focus-visible:border-transparent focus-visible:ring-0";
 
   return (
-    <div className="relative h-dvh overflow-hidden bg-[#fef7f1] text-[#3d3566]">
-      <div
-        className="absolute inset-0 hidden bg-cover bg-center lg:block"
-        style={{ backgroundImage: `url(${BASE_PATH}/login/welcome-scene.jpg)` }}
-        aria-hidden
-      />
-      <div className="absolute top-5 left-5 z-20 sm:top-6 lg:left-auto lg:right-8">
-        <BrandLogo priority className="h-11 w-auto max-w-[220px] object-contain object-left lg:object-right" />
-      </div>
-      <section className="relative z-10 mx-auto flex h-dvh w-full max-w-[420px] flex-col overflow-y-auto px-5 pt-16 pb-5 sm:px-6 lg:mx-0 lg:ml-10 lg:pt-5 xl:ml-16">
-        <div className="my-auto flex w-full flex-col gap-5">
-        <div>
-          <div className="flex w-full min-w-0 flex-col rounded-[28px] border border-border bg-card px-5 py-5 text-card-foreground shadow-none sm:px-6">
-            <h2 className="text-center text-[1.65rem] font-semibold tracking-tight text-foreground">Sign in to your account</h2>
+    <div className="min-h-dvh bg-background lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(28rem,0.9fr)]">
+      <aside className="relative hidden overflow-hidden bg-primary text-primary-foreground lg:flex">
+        <div className="pointer-events-none absolute -top-24 -left-20 size-80 rounded-full bg-white/10" aria-hidden />
+        <div className="pointer-events-none absolute right-[-4rem] bottom-8 size-72 rounded-full bg-white/10" aria-hidden />
+        <div className="relative flex flex-1 flex-col p-10 xl:p-14">
+          <div className="w-fit rounded-2xl bg-white px-4 py-3 shadow-sm">
+            <BrandLogo priority className="h-12 w-auto max-w-[250px]" />
+          </div>
+          <div className="flex flex-1 flex-col justify-center">
+            <div className="max-w-md">
+              <p className="text-xs font-medium tracking-[0.18em] text-primary-foreground/75 uppercase">{APP_SUBTITLE}</p>
+              <h1 className="mt-3 text-4xl font-semibold tracking-tight xl:text-5xl">{APP_NAME}</h1>
+              <p className="mt-4 text-base leading-7 text-primary-foreground/85">
+                {COMPANY_NAME}
+                <span className="px-1.5">·</span>
+                {COMPANY_TAGLINE}
+              </p>
+            </div>
+          </div>
+          <p className="text-sm text-primary-foreground/70">
+            {AGENCY.city}
+            <span className="px-1.5">·</span>
+            {AGENCY.hours}
+          </p>
+        </div>
+      </aside>
+
+      <section className="flex min-h-dvh flex-col overflow-y-auto px-5 py-6 sm:px-8">
+        <div className="lg:hidden">
+          <BrandLogo priority className="h-10 w-auto max-w-[210px]" />
+        </div>
+        <div className="mx-auto flex w-full max-w-[28rem] flex-1 flex-col justify-center py-8">
+          <div className="flex w-full min-w-0 flex-col rounded-2xl border border-border bg-card px-5 py-6 text-card-foreground shadow-sm sm:px-7 sm:py-8">
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground">Sign in to your account</h2>
             {dailyLine ? (
-              <p className="mt-2 text-center text-sm leading-6 text-muted-foreground">{dailyLine}</p>
+              <p className="mt-2 text-sm leading-6 text-pretty text-muted-foreground">{dailyLine}</p>
             ) : null}
 
             <form className="mt-5 space-y-3" autoComplete="off" onSubmit={form.handleSubmit(onSubmit)}>
@@ -211,20 +231,19 @@ export function LoginPage() {
 
         </div>
 
-        <div className="pt-1">
+        <div className="mx-auto w-full max-w-[28rem] pb-2">
           {appVersionLabel ? (
-            <p className="mb-2 text-[11px] text-[#8d86a3]">{appVersionLabel}</p>
+            <p className="mb-2 text-[11px] text-muted-foreground">{appVersionLabel}</p>
           ) : null}
-          <p className="text-xs leading-5 text-[#6d6784]">
+          <p className="text-xs leading-5 text-muted-foreground">
             © {new Date().getFullYear()} {COMPANY_NAME}. For authorized personnel only.
             <span className="mt-1 block">
               Developed by{" "}
-              <a href={DEVELOPED_BY_URL} target="_blank" rel="noreferrer" className="hover:text-[#3d3566]">
+              <a href={DEVELOPED_BY_URL} target="_blank" rel="noreferrer" className="text-foreground hover:underline">
                 {DEVELOPED_BY}
               </a>
             </span>
           </p>
-        </div>
         </div>
       </section>
     </div>

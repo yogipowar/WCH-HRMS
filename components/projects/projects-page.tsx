@@ -130,7 +130,11 @@ export function ProjectsPage() {
       id: "websiteName",
       header: "Website name",
       accessor: (row) => row.websiteName,
-      cell: (row) => row.websiteName,
+      cell: (row) => (
+        <span className="block max-w-56 truncate" title={row.websiteName}>
+          {row.websiteName}
+        </span>
+      ),
     },
     {
       id: "status",
@@ -327,7 +331,7 @@ export function ProjectsPage() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex min-w-0 items-center gap-2">
-                      <span className="min-w-0 truncate text-sm font-medium">
+                      <span className="block min-w-0 truncate text-sm font-medium" title={project.websiteName}>
                         <span className="mr-2 font-mono text-xs font-medium text-muted-foreground">{projectCode(project.serialNo)}</span>
                         {project.websiteName}
                       </span>
@@ -532,14 +536,25 @@ function SiteDetails({
       <PopoverTrigger className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground">
         Site
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80">
-        <div className="space-y-2 text-sm">
+      <PopoverContent align="end" className="w-80 max-w-[calc(100vw-2rem)] overflow-hidden">
+        <div className="min-w-0 space-y-2 text-sm">
+          <p className="truncate font-medium" title={project.websiteName}>
+            <span className="mr-1.5 font-mono text-xs font-medium text-muted-foreground">{projectCode(project.serialNo)}</span>
+            {project.websiteName}
+          </p>
           <Detail
-            label="Website"
+            label="Website URL"
             value={
               project.websiteUrl ? (
-                <a href={normalizeUrl(project.websiteUrl)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
-                  Open <ExternalLink className="size-3" />
+                <a
+                  href={normalizeUrl(project.websiteUrl)}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={project.websiteUrl}
+                  className="flex min-w-0 items-center gap-1 text-primary hover:underline"
+                >
+                  <span className="min-w-0 truncate">{project.websiteUrl}</span>
+                  <ExternalLink className="size-3 shrink-0" />
                 </a>
               ) : (
                 "—"
@@ -550,26 +565,33 @@ function SiteDetails({
           <Detail
             label="Pass"
             value={
-              <button type="button" className="inline-flex items-center gap-1 font-mono text-xs" onClick={onTogglePassword}>
-                {revealed ? project.loginPassword || "—" : project.loginPassword ? "••••••••" : "—"}
-                {project.loginPassword ? revealed ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" /> : null}
+              <button type="button" className="inline-flex max-w-full items-center gap-1 font-mono text-xs" onClick={onTogglePassword}>
+                <span className="min-w-0 truncate">{revealed ? project.loginPassword || "—" : project.loginPassword ? "••••••••" : "—"}</span>
+                {project.loginPassword ? revealed ? <EyeOff className="size-3.5 shrink-0" /> : <Eye className="size-3.5 shrink-0" /> : null}
               </button>
             }
           />
-          <Detail label="Technology" value={project.technologyUsed || "—"} />
+          <Detail label="Technology used" value={project.technologyUsed || "—"} />
           <Detail
-            label="Figma"
+            label="Figma link"
             value={
               project.figmaLink ? (
-                <a href={normalizeUrl(project.figmaLink)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
-                  Open <ExternalLink className="size-3" />
+                <a
+                  href={normalizeUrl(project.figmaLink)}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={project.figmaLink}
+                  className="flex min-w-0 items-center gap-1 text-primary hover:underline"
+                >
+                  <span className="min-w-0 truncate">{project.figmaLink}</span>
+                  <ExternalLink className="size-3 shrink-0" />
                 </a>
               ) : (
                 "—"
               )
             }
           />
-          <Detail label="Manager" value={employeeName(employees, project.projectManagerId)} />
+          <Detail label="Project manager" value={employeeName(employees, project.projectManagerId)} />
           <Detail label="Team" value={<TeamCountPopover members={members} />} />
         </div>
       </PopoverContent>
@@ -578,10 +600,13 @@ function SiteDetails({
 }
 
 function Detail({ label, value }: { label: string; value: ReactNode }) {
+  const title = typeof value === "string" ? value : undefined;
   return (
-    <div className="grid gap-0.5 sm:grid-cols-[8.5rem_minmax(0,1fr)] sm:gap-3">
+    <div className="grid min-w-0 grid-cols-[6.75rem_minmax(0,1fr)] items-baseline gap-2">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <div className="min-w-0 break-words">{value}</div>
+      <div className="min-w-0 truncate" title={title}>
+        {value}
+      </div>
     </div>
   );
 }

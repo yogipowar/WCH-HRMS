@@ -4,13 +4,17 @@ import { useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { useColorThemeStore } from "@/lib/stores/color-theme-store";
-import { DEFAULT_COLOR_THEME, resolveColorTheme } from "@/lib/theme/color-themes";
+import { resolveColorTheme } from "@/lib/theme/color-themes";
 
 export function ColorThemeSync() {
   const colorTheme = useColorThemeStore((state) => state.colorTheme);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = resolveColorTheme(colorTheme);
+    const apply = () => {
+      document.documentElement.dataset.theme = resolveColorTheme(useColorThemeStore.getState().colorTheme);
+    };
+    if (useColorThemeStore.persist.hasHydrated()) apply();
+    return useColorThemeStore.persist.onFinishHydration(apply);
   }, [colorTheme]);
 
   return null;
@@ -34,11 +38,7 @@ export function AccountThemeSync() {
     const key = !isAuthenticated || !userId ? "guest" : `${userId}:${palette}:${mode}`;
     if (applied.current === key) return;
     applied.current = key;
-    if (key === "guest") {
-      setColorTheme(DEFAULT_COLOR_THEME);
-      setTheme("light");
-      return;
-    }
+    if (key === "guest") return;
     setColorTheme(palette);
     setTheme(mode);
   }, [status, isAuthenticated, userId, colorTheme, appearance, setColorTheme, setTheme]);
