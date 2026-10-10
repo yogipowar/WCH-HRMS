@@ -30,7 +30,7 @@ import type {
   User,
 } from "@/types";
 import { DOCUMENT_TYPES, LEAVE_TYPES } from "@/types";
-import { applyAdminAttendanceTimes, adminAttendanceEditOpen, type AdminTimeInput } from "@/lib/attendance/admin-adjust";
+import { applyAdminAttendanceTimes, adminAttendanceEditOpen, correctMisappliedHalfDays, type AdminTimeInput } from "@/lib/attendance/admin-adjust";
 import { applyLeaveToBalance, currentLeaveYearStart, defaultLeaveBalance, isInCurrentLeaveYear, leaveYearLabel, YEARLY_PAID_LEAVES } from "@/lib/leave/policy";
 import { isPayslipReleased } from "@/lib/payroll/record";
 import { resolveColorTheme } from "@/lib/theme/color-themes";
@@ -402,6 +402,7 @@ export async function loadBootstrap(includePasswords = false, viewerEmployeeId: 
 
   await alignLeaveBalancesToYear(leaveBalances);
 
+  const companySettings = parseJson<CompanySettings>(settingsRows[0]?.payload, defaultSettings);
   const mappedProjects = projects.map(mapProject).map((project) =>
     includePasswords || isOnProject(project, viewerEmployeeId) ? project : { ...project, overview: "" },
   );
@@ -430,7 +431,12 @@ export async function loadBootstrap(includePasswords = false, viewerEmployeeId: 
       departmentId: row.department_id,
       status: row.status,
     })),
-    attendanceRecords: attendanceRecords.map(mapAttendance),
+    attendanceRecords: await correctedAttendanceRecords(
+      attendanceRecords.map(mapAttendance),
+      employees.map(mapEmployee),
+      lateRemovalRequests.map(mapLateRemoval),
+      companySettings,
+    ),
     leaveBalances: leaveBalances.map((row) => ({
       employeeId: row.employee_id,
       casual: number(row.casual),
@@ -464,7 +470,7 @@ export async function loadBootstrap(includePasswords = false, viewerEmployeeId: 
     projectTaskImages: (projectTaskImages as RowDataPacket[])
       .map(mapProjectTaskImage)
       .filter((item) => visibleTaskIds.has(item.taskId)),
-    settings: parseJson<CompanySettings>(settingsRows[0]?.payload, defaultSettings),
+    settings: companySettings,
   };
 }
 
@@ -565,6 +571,28 @@ async function upsertPayroll(record: PayrollRecord) {
       record.payslipAvailable ? 1 : 0,
     ],
   );
+}
+
+async function correctedAttendanceRecords(
+  records: AttendanceRecord[],
+  employees: Employee[],
+  lateRemovals: LateRemovalRequest[],
+  companySettings: CompanySettings,
+) {
+  const corrected = correctMisappliedHalfDays({
+    records,
+    employees,
+    lateRemovals,
+    defaultWorkStart: companySettings.workStartTime,
+    defaultGrace: companySettings.lateAfterMinutes,
+  });
+  const previous = new Map(records.map((record) => [record.id, record]));
+  for (const record of corrected) {
+    const before = previous.get(record.id);
+    if (!before || (before.status === record.status && before.lateMinutes === record.lateMinutes)) continue;
+    await upsertAttendance(record);
+  }
+  return corrected;
 }
 
 async function upsertAttendance(record: AttendanceRecord) {
@@ -1346,6 +1374,8 @@ export async function handleApiRequest(request: Request, parts: string[]) {
       const existing = mapAttendance(rows[0]);
       const employees = await query("SELECT * FROM employees WHERE id = ?", [existing.employeeId]);
       const employee = employees[0] ? mapEmployee(employees[0]) : null;
+      const settingsRows = await query("SELECT payload FROM settings WHERE id = 1");
+      const companySettings = parseJson<CompanySettings>(settingsRows[0]?.payload, defaultSettings);
       const monthRows = await query(
         "SELECT * FROM attendance_records WHERE employee_id = ? AND DATE_FORMAT(date, '%Y-%m') = ?",
         [existing.employeeId, existing.date.slice(0, 7)],
@@ -1358,8 +1388,8 @@ export async function handleApiRequest(request: Request, parts: string[]) {
           clockOut: String(body.clockOut ?? ""),
           breaks: Array.isArray(body.breaks) ? body.breaks : [],
         },
-        workStartTime: employee?.workStartTime || defaultSettings.workStartTime,
-        lateAfterMinutes: employee?.lateAfterMinutes ?? defaultSettings.lateAfterMinutes,
+        workStartTime: employee?.workStartTime || companySettings.workStartTime,
+        lateAfterMinutes: employee?.lateAfterMinutes ?? companySettings.lateAfterMinutes,
         monthRecords: monthRows.map(mapAttendance),
         lateRemovals: removalRows.map(mapLateRemoval),
       });

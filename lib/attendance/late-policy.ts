@@ -19,18 +19,23 @@ export function isCountableLateMark(
   );
 }
 
-/** Countable late days in the same calendar month as `date`, optionally excluding one attendance id. */
+/**
+ * Countable late days in the same calendar month as `date`.
+ * Pass `onlyBeforeDate` for the half-day rule so later days in the month do not count.
+ */
 export function countableLateMarksInMonth(
   records: AttendanceRecord[],
   requests: LateRemovalRequest[],
   employeeId: string,
   date: string,
   excludeAttendanceId?: string,
+  onlyBeforeDate = false,
 ): number {
   const month = monthKeyFromDate(date);
   return records.filter((record) => {
     if (record.employeeId !== employeeId) return false;
     if (monthKeyFromDate(record.date) !== month) return false;
+    if (onlyBeforeDate && record.date >= date) return false;
     if (excludeAttendanceId && record.id === excludeAttendanceId) return false;
     return isCountableLateMark(record, requests);
   }).length;

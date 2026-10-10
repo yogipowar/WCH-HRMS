@@ -52,6 +52,30 @@ export function officeTimeValue(iso: string | null | undefined): string {
   return `${hours}:${minutes}`;
 }
 
+function clockMinutes(value: string): number | null {
+  const match = /^(\d{1,2}):(\d{2})/.exec(value.trim());
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+/** Minutes late against the employee's own work start and grace. On time is 0. */
+export function lateMinutesForClockIn(
+  clockInIso: string | null,
+  workStartTime: string,
+  lateAfterMinutes: number,
+): number {
+  if (!clockInIso) return 0;
+  const arrived = clockMinutes(officeTimeValue(clockInIso));
+  const start = clockMinutes(workStartTime);
+  if (arrived === null || start === null) return 0;
+  const allowed = start + Math.max(0, lateAfterMinutes);
+  if (arrived <= allowed) return 0;
+  return arrived - start;
+}
+
 function validTime(value: string): boolean {
   return value === "" || TIME_PATTERN.test(value);
 }
@@ -172,15 +196,7 @@ export function applyAdminAttendanceTimes(options: {
         ? "ON_PERSONAL_BREAK"
         : "WORKING";
 
-  const clockInUnchanged = officeTimeValue(record.clockIn) === clockIn;
-  const scheduled = officeDateTime(record.date, options.workStartTime || "09:30");
-  const graceMs = Math.max(0, options.lateAfterMinutes) * 60_000;
-  const arrived = new Date(clockInIso).getTime();
-  const lateMinutes = clockInUnchanged
-    ? record.lateMinutes
-    : arrived > new Date(scheduled).getTime() + graceMs
-      ? minutesBetween(scheduled, clockInIso)
-      : 0;
+  const lateMinutes = lateMinutesForClockIn(clockInIso, options.workStartTime, options.lateAfterMinutes);
 
   const anchor = clockOutIso
     ? new Date(clockOutIso)
@@ -213,6 +229,7 @@ export function applyAdminAttendanceTimes(options: {
       record.employeeId,
       record.date,
       record.id,
+      true,
     );
     status = shouldApplyHalfDayForLate(prior) ? "HALF_DAY" : "LATE";
   } else {
@@ -227,4 +244,61 @@ export function applyAdminAttendanceTimes(options: {
       breakMinutes: summary.breakMinutes,
     },
   };
+}
+
+/** Fixes Late and Half Day rows using each employee's start time, grace, and only earlier days in that month. */
+export function correctMisappliedHalfDays(options: {
+  records: AttendanceRecord[];
+  employees: { id: string; workStartTime: string; lateAfterMinutes: number }[];
+  lateRemovals: LateRemovalRequest[];
+  defaultWorkStart: string;
+  defaultGrace: number;
+}): AttendanceRecord[] {
+  const schedule = new Map(options.employees.map((employee) => [employee.id, employee]));
+  const approved = new Set(
+    options.lateRemovals.filter((item) => item.status === "APPROVED").map((item) => item.attendanceId),
+  );
+  const next = options.records.map((record) => ({ ...record }));
+  const byEmployee = new Map<string, AttendanceRecord[]>();
+  for (const record of next) {
+    const list = byEmployee.get(record.employeeId) ?? [];
+    list.push(record);
+    byEmployee.set(record.employeeId, list);
+  }
+
+  for (const list of byEmployee.values()) {
+    list.sort((left, right) => left.date.localeCompare(right.date) || left.id.localeCompare(right.id));
+    for (const record of list) {
+      if (approved.has(record.id) || !record.clockIn) continue;
+      if (record.status !== "LATE" && record.status !== "HALF_DAY") continue;
+      const employee = schedule.get(record.employeeId);
+      const late = lateMinutesForClockIn(
+        record.clockIn,
+        employee?.workStartTime || options.defaultWorkStart,
+        employee?.lateAfterMinutes ?? options.defaultGrace,
+      );
+      let status: AttendanceStatus;
+      if (!record.clockOut) {
+        status = late > 0 ? "LATE" : "PRESENT";
+      } else if (record.activeWorkingMinutes < record.requiredHours * 60) {
+        status = "INCOMPLETE";
+      } else if (late > 0) {
+        const prior = countableLateMarksInMonth(
+          next,
+          options.lateRemovals,
+          record.employeeId,
+          record.date,
+          record.id,
+          true,
+        );
+        status = shouldApplyHalfDayForLate(prior) ? "HALF_DAY" : "LATE";
+      } else {
+        status = "COMPLETED";
+      }
+      record.lateMinutes = late;
+      record.status = status;
+    }
+  }
+
+  return next;
 }

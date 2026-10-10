@@ -180,6 +180,7 @@ function applyAction(
           employeeId,
           next.date,
           next.id,
+          true,
         );
         next.status = shouldApplyHalfDayForLate(priorLates) ? "HALF_DAY" : "LATE";
       } else {
