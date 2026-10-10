@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
+import { AdminAttendanceTimeEditor } from "@/components/attendance/admin-time-editor";
 import { AttendanceHistoryList } from "@/components/attendance/attendance-history-list";
 import { EmployeeAttendanceBoard } from "@/components/attendance/employee-attendance-board";
 import { AttendanceTimeline } from "@/components/attendance/attendance-timeline";
@@ -221,6 +222,7 @@ export function AttendanceDetailPage({ id }: { id: string }) {
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Required</p><p className="font-semibold">{formatDuration(summary.requiredMinutes)}</p></CardContent></Card>
         <Card><CardContent className="p-4"><AttendanceStatusBadge status={record.status} /></CardContent></Card>
       </div>
+      {user?.role === "MANAGEMENT" ? <AdminAttendanceTimeEditor record={record} /> : null}
       <Card>
         <CardHeader><CardTitle className="text-base">Timeline</CardTitle></CardHeader>
         <CardContent><AttendanceTimeline record={record} /></CardContent>

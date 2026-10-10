@@ -30,6 +30,7 @@ import type {
   User,
 } from "@/types";
 import { DOCUMENT_TYPES, LEAVE_TYPES } from "@/types";
+import { applyAdminAttendanceTimes, adminAttendanceEditOpen, type AdminTimeInput } from "@/lib/attendance/admin-adjust";
 import { applyLeaveToBalance, currentLeaveYearStart, defaultLeaveBalance, isInCurrentLeaveYear, leaveYearLabel, YEARLY_PAID_LEAVES } from "@/lib/leave/policy";
 import { isPayslipReleased } from "@/lib/payroll/record";
 import { resolveColorTheme } from "@/lib/theme/color-themes";
@@ -1325,6 +1326,48 @@ export async function handleApiRequest(request: Request, parts: string[]) {
         ]);
       }
       return jsonResponse(200, { ok: true });
+    }
+
+    if (parts[0] === "attendance" && parts[1] === "adjust" && request.method === "POST") {
+      if (user.role !== "MANAGEMENT") {
+        return jsonResponse(403, { error: "Only admins can correct attendance times." });
+      }
+      if (!adminAttendanceEditOpen()) {
+        return jsonResponse(403, { error: "Attendance time corrections ended on 30 Oct 2026." });
+      }
+      const body = (await request.json()) as AdminTimeInput & { attendanceId?: string };
+      if (!body.attendanceId) {
+        return jsonResponse(400, { error: "Attendance record not found." });
+      }
+      const rows = await query("SELECT * FROM attendance_records WHERE id = ?", [body.attendanceId]);
+      if (!rows[0]) {
+        return jsonResponse(404, { error: "Attendance record not found." });
+      }
+      const existing = mapAttendance(rows[0]);
+      const employees = await query("SELECT * FROM employees WHERE id = ?", [existing.employeeId]);
+      const employee = employees[0] ? mapEmployee(employees[0]) : null;
+      const monthRows = await query(
+        "SELECT * FROM attendance_records WHERE employee_id = ? AND DATE_FORMAT(date, '%Y-%m') = ?",
+        [existing.employeeId, existing.date.slice(0, 7)],
+      );
+      const removalRows = await query("SELECT * FROM late_removal_requests WHERE employee_id = ?", [existing.employeeId]);
+      const result = applyAdminAttendanceTimes({
+        record: existing,
+        input: {
+          clockIn: String(body.clockIn ?? ""),
+          clockOut: String(body.clockOut ?? ""),
+          breaks: Array.isArray(body.breaks) ? body.breaks : [],
+        },
+        workStartTime: employee?.workStartTime || defaultSettings.workStartTime,
+        lateAfterMinutes: employee?.lateAfterMinutes ?? defaultSettings.lateAfterMinutes,
+        monthRecords: monthRows.map(mapAttendance),
+        lateRemovals: removalRows.map(mapLateRemoval),
+      });
+      if ("error" in result) {
+        return jsonResponse(400, { error: result.error });
+      }
+      await upsertAttendance(result.record);
+      return jsonResponse(200, result.record);
     }
 
     if (parts[0] === "attendance" && request.method === "PUT") {

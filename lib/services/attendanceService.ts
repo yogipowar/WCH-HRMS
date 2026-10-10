@@ -1,4 +1,5 @@
 import { format, parseISO } from "date-fns";
+import { adminAttendanceEditOpen, applyAdminAttendanceTimes, type AdminTimeInput } from "@/lib/attendance/admin-adjust";
 import {
   computeStoredAttendanceMetrics,
   getActiveBreak,
@@ -278,6 +279,35 @@ export const attendanceService = {
   },
   validate(employeeId: string, action: AttendanceAction) {
     return validateAttendanceAction(this.getTodayAttendance(employeeId), action);
+  },
+  async adjustTimes(attendanceId: string, input: AdminTimeInput) {
+    if (!adminAttendanceEditOpen()) {
+      throw new Error("Attendance time corrections ended on 30 Oct 2026.");
+    }
+    const data = getData();
+    const record = data.attendanceRecords.find((item) => item.id === attendanceId);
+    if (!record) {
+      throw new Error("Attendance record not found.");
+    }
+    const employee = data.employees.find((item) => item.id === record.employeeId);
+    const preview = applyAdminAttendanceTimes({
+      record,
+      input,
+      workStartTime: employee?.workStartTime || data.settings.workStartTime,
+      lateAfterMinutes: employee?.lateAfterMinutes ?? data.settings.lateAfterMinutes,
+      monthRecords: data.attendanceRecords,
+      lateRemovals: data.lateRemovalRequests,
+    });
+    if ("error" in preview) {
+      throw new Error(preview.error);
+    }
+    const saved = await api.adjustAttendance({ attendanceId, ...input });
+    updateData((store) => ({
+      attendanceRecords: store.attendanceRecords.some((item) => item.id === saved.id)
+        ? store.attendanceRecords.map((item) => (item.id === saved.id ? saved : item))
+        : [...store.attendanceRecords, saved],
+    }));
+    return saved;
   },
 };
 

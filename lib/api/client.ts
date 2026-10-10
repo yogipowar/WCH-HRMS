@@ -198,6 +198,9 @@ export const api = {
   saveAttendance(body: unknown) {
     return request("/api/attendance", { method: "PUT", body: JSON.stringify(body) });
   },
+  adjustAttendance(body: unknown) {
+    return request<AttendanceRecord>("/api/attendance/adjust", { method: "POST", body: JSON.stringify(body) });
+  },
   createAnnouncement(body: unknown) {
     return request("/api/announcements", { method: "POST", body: JSON.stringify(body) });
   },

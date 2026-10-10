@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { AdminAttendanceTimeEditor } from "@/components/attendance/admin-time-editor";
 import { AttendanceTimeline } from "@/components/attendance/attendance-timeline";
 import { LateRemovalRequestPanel } from "@/components/attendance/late-removal-panel";
 import { AttendanceStatusBadge } from "@/components/shared/status-badge";
@@ -87,7 +88,7 @@ export function AttendanceHistoryList({
             {open ? (
               <CardContent className="space-y-4 border-t pt-4">
                 <AttendanceTimeline record={record} />
-                {!showEmployee ? <LateRemovalRequestPanel record={record} showDate /> : null}
+                {showEmployee ? <AdminAttendanceTimeEditor record={record} /> : <LateRemovalRequestPanel record={record} showDate />}
               </CardContent>
             ) : null}
           </Card>
