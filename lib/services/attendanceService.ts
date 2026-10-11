@@ -11,6 +11,7 @@ import {
 import { findOpenAttendance } from "@/lib/attendance/session";
 import { getNextState, validateAttendanceAction } from "@/lib/attendance/state-machine";
 import { dayKind, weeklyOffReason } from "@/lib/attendance/work-calendar";
+import { hasApprovedHalfDayLeave } from "@/lib/leave/policy";
 import { api } from "@/lib/api/client";
 import { createId } from "@/lib/lookups";
 import { getData, updateData } from "@/lib/stores/data-store";
@@ -171,7 +172,10 @@ function applyAction(
           : { startTime: next.clockIn ?? timestamp, endTime: timestamp },
       });
       const completed = next.activeWorkingMinutes >= next.requiredHours * 60;
-      if (!completed) {
+      const approvedHalfDay = hasApprovedHalfDayLeave(data.leaveRequests, employeeId, next.date);
+      if (approvedHalfDay && !completed) {
+        next.status = "HALF_DAY";
+      } else if (!completed) {
         next.status = "INCOMPLETE";
       } else if (next.lateMinutes > 0) {
         const priorLates = countableLateMarksInMonth(
@@ -298,6 +302,7 @@ export const attendanceService = {
       lateAfterMinutes: employee?.lateAfterMinutes ?? data.settings.lateAfterMinutes,
       monthRecords: data.attendanceRecords,
       lateRemovals: data.lateRemovalRequests,
+      approvedHalfDayLeave: hasApprovedHalfDayLeave(data.leaveRequests, record.employeeId, record.date),
     });
     if ("error" in preview) {
       throw new Error(preview.error);

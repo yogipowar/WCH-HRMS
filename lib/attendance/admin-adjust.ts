@@ -1,4 +1,5 @@
 import { countableLateMarksInMonth, shouldApplyHalfDayForLate } from "@/lib/attendance/late-policy";
+import { hasApprovedHalfDayLeave } from "@/lib/leave/policy";
 import { minutesBetween, summarizeAttendance } from "@/lib/attendance/calculations";
 import type { AttendanceRecord, AttendanceStatus, BreakRecord, BreakType, LateRemovalRequest } from "@/types";
 
@@ -87,6 +88,7 @@ export function applyAdminAttendanceTimes(options: {
   lateAfterMinutes: number;
   monthRecords: AttendanceRecord[];
   lateRemovals: LateRemovalRequest[];
+  approvedHalfDayLeave?: boolean;
   now?: Date;
 }): { record: AttendanceRecord } | { error: string } {
   const now = options.now ?? new Date();
@@ -221,7 +223,7 @@ export function applyAdminAttendanceTimes(options: {
   if (!clockOutIso) {
     status = lateMinutes > 0 ? "LATE" : "PRESENT";
   } else if (active < required) {
-    status = "INCOMPLETE";
+    status = options.approvedHalfDayLeave ? "HALF_DAY" : "INCOMPLETE";
   } else if (lateMinutes > 0) {
     const prior = countableLateMarksInMonth(
       options.monthRecords,
@@ -251,6 +253,7 @@ export function correctMisappliedHalfDays(options: {
   records: AttendanceRecord[];
   employees: { id: string; workStartTime: string; lateAfterMinutes: number }[];
   lateRemovals: LateRemovalRequest[];
+  leaveRequests: Parameters<typeof hasApprovedHalfDayLeave>[0];
   defaultWorkStart: string;
   defaultGrace: number;
 }): AttendanceRecord[] {
@@ -270,6 +273,14 @@ export function correctMisappliedHalfDays(options: {
     list.sort((left, right) => left.date.localeCompare(right.date) || left.id.localeCompare(right.id));
     for (const record of list) {
       if (approved.has(record.id) || !record.clockIn) continue;
+      if (
+        record.clockOut &&
+        record.activeWorkingMinutes < record.requiredHours * 60 &&
+        hasApprovedHalfDayLeave(options.leaveRequests, record.employeeId, record.date)
+      ) {
+        record.status = "HALF_DAY";
+        continue;
+      }
       if (record.status !== "LATE" && record.status !== "HALF_DAY") continue;
       const employee = schedule.get(record.employeeId);
       const late = lateMinutesForClockIn(

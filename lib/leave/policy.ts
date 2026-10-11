@@ -118,6 +118,21 @@ export function leaveDaysUsed(request: Pick<LeaveRequest, "startDate" | "endDate
   return request.isHalfDay ? 0.5 : daysBetweenInclusive(request.startDate, request.endDate);
 }
 
+export function hasApprovedHalfDayLeave(
+  requests: Pick<LeaveRequest, "employeeId" | "status" | "isHalfDay" | "startDate" | "endDate">[],
+  employeeId: string,
+  date: string,
+): boolean {
+  return requests.some(
+    (item) =>
+      item.employeeId === employeeId &&
+      item.status === "APPROVED" &&
+      item.isHalfDay &&
+      item.startDate.slice(0, 10) <= date.slice(0, 10) &&
+      item.endDate.slice(0, 10) >= date.slice(0, 10),
+  );
+}
+
 export function remainingPaidDays(balance: LeaveBalance): number {
   return balance.casual + balance.sick + balance.privilege;
 }

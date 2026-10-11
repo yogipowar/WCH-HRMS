@@ -31,7 +31,7 @@ import type {
 } from "@/types";
 import { DOCUMENT_TYPES, LEAVE_TYPES } from "@/types";
 import { applyAdminAttendanceTimes, adminAttendanceEditOpen, correctMisappliedHalfDays, type AdminTimeInput } from "@/lib/attendance/admin-adjust";
-import { applyLeaveToBalance, currentLeaveYearStart, defaultLeaveBalance, isInCurrentLeaveYear, leaveYearLabel, YEARLY_PAID_LEAVES } from "@/lib/leave/policy";
+import { applyLeaveToBalance, currentLeaveYearStart, defaultLeaveBalance, hasApprovedHalfDayLeave, isInCurrentLeaveYear, leaveYearLabel, YEARLY_PAID_LEAVES } from "@/lib/leave/policy";
 import { isPayslipReleased } from "@/lib/payroll/record";
 import { resolveColorTheme } from "@/lib/theme/color-themes";
 import { todayIsoDate } from "@/lib/utils/format";
@@ -435,6 +435,7 @@ export async function loadBootstrap(includePasswords = false, viewerEmployeeId: 
       attendanceRecords.map(mapAttendance),
       employees.map(mapEmployee),
       lateRemovalRequests.map(mapLateRemoval),
+      leaveRequests.map(mapLeave),
       companySettings,
     ),
     leaveBalances: leaveBalances.map((row) => ({
@@ -577,12 +578,14 @@ async function correctedAttendanceRecords(
   records: AttendanceRecord[],
   employees: Employee[],
   lateRemovals: LateRemovalRequest[],
+  leaveRequests: LeaveRequest[],
   companySettings: CompanySettings,
 ) {
   const corrected = correctMisappliedHalfDays({
     records,
     employees,
     lateRemovals,
+    leaveRequests,
     defaultWorkStart: companySettings.workStartTime,
     defaultGrace: companySettings.lateAfterMinutes,
   });
@@ -1381,6 +1384,7 @@ export async function handleApiRequest(request: Request, parts: string[]) {
         [existing.employeeId, existing.date.slice(0, 7)],
       );
       const removalRows = await query("SELECT * FROM late_removal_requests WHERE employee_id = ?", [existing.employeeId]);
+      const leaveRows = await query("SELECT * FROM leave_requests WHERE employee_id = ?", [existing.employeeId]);
       const result = applyAdminAttendanceTimes({
         record: existing,
         input: {
@@ -1392,6 +1396,7 @@ export async function handleApiRequest(request: Request, parts: string[]) {
         lateAfterMinutes: employee?.lateAfterMinutes ?? companySettings.lateAfterMinutes,
         monthRecords: monthRows.map(mapAttendance),
         lateRemovals: removalRows.map(mapLateRemoval),
+        approvedHalfDayLeave: hasApprovedHalfDayLeave(leaveRows.map(mapLeave), existing.employeeId, existing.date),
       });
       if ("error" in result) {
         return jsonResponse(400, { error: result.error });
