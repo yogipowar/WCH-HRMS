@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { ClockInReminderSync } from "@/components/attendance/clock-in-reminder-sync";
 import { AppHeader } from "@/components/layout/app-header";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { MobileTabBar } from "@/components/layout/mobile-tab-bar";
@@ -53,6 +54,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen bg-background">
       <AppSidebar role={user.role} />
       <div className="flex min-w-0 flex-1 flex-col">
+        <ClockInReminderSync />
         <AppHeader user={user} onLogout={logout} />
         <main className="flex-1 overflow-x-hidden px-4 py-5 pb-24 sm:px-6 lg:px-7 lg:pb-6">
           {children}

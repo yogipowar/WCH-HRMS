@@ -9,6 +9,8 @@ declare global {
       getVersionName?: () => string;
       openUpdate?: (url: string) => void;
       startGoogleOAuth?: (url: string) => void;
+      scheduleClockInReminder?: (workStart: string) => void;
+      markClockedInToday?: () => void;
     };
     google?: {
       accounts: {

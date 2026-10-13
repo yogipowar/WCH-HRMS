@@ -1,11 +1,14 @@
 package com.webcreatehub.hrms;
 
 import android.annotation.SuppressLint;
+import android.Manifest;
+import android.app.AlarmManager;
 import android.app.DownloadManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
@@ -30,6 +33,8 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.browser.customtabs.CustomTabsIntent;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
 import java.io.File;
@@ -441,6 +446,66 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
             runOnUiThread(() -> openGoogleOAuth(url.trim()));
+        }
+
+        @JavascriptInterface
+        public void scheduleClockInReminder(String workStart) {
+            int[] parts = parseClock(workStart);
+            if (parts == null) {
+                return;
+            }
+            runOnUiThread(() -> {
+                ensureReminderPermissions();
+                ClockInReminder.schedule(MainActivity.this, parts[0], parts[1]);
+            });
+        }
+
+        @JavascriptInterface
+        public void markClockedInToday() {
+            ClockInReminder.markClockedInToday(MainActivity.this);
+        }
+    }
+
+    private void ensureReminderPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+            && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[] { Manifest.permission.POST_NOTIFICATIONS }, 41);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            AlarmManager alarms = (AlarmManager) getSystemService(ALARM_SERVICE);
+            SharedPreferences prefs = getSharedPreferences(ClockInReminder.PREFS, MODE_PRIVATE);
+            if (alarms != null && !alarms.canScheduleExactAlarms() && !prefs.getBoolean("asked_exact_alarm", false)) {
+                prefs.edit().putBoolean("asked_exact_alarm", true).apply();
+                try {
+                    startActivity(new Intent(
+                        Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                        Uri.parse("package:" + getPackageName())
+                    ));
+                } catch (Exception ignored) {
+                    // The reminder still schedules with a while-idle alarm.
+                }
+            }
+        }
+    }
+
+    private static int[] parseClock(String value) {
+        if (value == null) {
+            return null;
+        }
+        String[] parts = value.trim().split(":");
+        if (parts.length < 2) {
+            return null;
+        }
+        try {
+            int hour = Integer.parseInt(parts[0]);
+            int minute = Integer.parseInt(parts[1]);
+            if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+                return null;
+            }
+            return new int[] { hour, minute };
+        } catch (NumberFormatException ignored) {
+            return null;
         }
     }
 
