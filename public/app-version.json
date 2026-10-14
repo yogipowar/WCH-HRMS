@@ -1,6 +1,6 @@
 {
-  "versionCode": 8,
-  "versionName": "1.7",
+  "versionCode": 9,
+  "versionName": "1.8",
   "apkUrl": "https://hrms.webcreatehub.com/downloads/WCH-HRMS.apk",
-  "message": "Employee sign-in no longer opens an error page."
+  "message": "Sign-in stays in the app. If Update opens an error page, install this file from Chrome: https://hrms.webcreatehub.com/downloads/WCH-HRMS.apk"
 }

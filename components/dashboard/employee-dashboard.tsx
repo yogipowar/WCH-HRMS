@@ -59,6 +59,7 @@ export function EmployeeDashboard({ employee }: { employee: Employee }) {
     .slice(0, 4);
   const dailyHours = employeeDailyHours(data.attendanceRecords, employee.id, now, 7);
   const weeklyHours = employeeWeeklyHours(data.attendanceRecords, employee.id, employee.dailyRequiredHours, now);
+  const requiredHours = Math.max(1, Math.min(24, Number(employee.dailyRequiredHours) || 9));
   const presentCount = monthRecords.filter((item) => item.status === "PRESENT" || item.status === "LATE" || item.status === "COMPLETED").length;
   const absentCount = monthRecords.filter((item) => item.status === "ABSENT").length;
   const leaveCount = monthRecords.filter((item) => item.status === "ON_LEAVE").length;
@@ -123,8 +124,8 @@ export function EmployeeDashboard({ employee }: { employee: Employee }) {
               <YAxis
                 allowDecimals={false}
                 tick={{ fontSize: 11 }}
-                domain={[0, employee.dailyRequiredHours]}
-                ticks={Array.from({ length: employee.dailyRequiredHours + 1 }, (_, hour) => hour).filter((hour) => hour % 3 === 0 || hour === employee.dailyRequiredHours)}
+                domain={[0, requiredHours]}
+                ticks={Array.from({ length: requiredHours + 1 }, (_, hour) => hour).filter((hour) => hour % 3 === 0 || hour === requiredHours)}
                 width={28}
               />
               <Tooltip formatter={(value) => [`${Number(value ?? 0)}h`, "Worked"]} />

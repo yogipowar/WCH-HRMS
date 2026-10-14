@@ -19,6 +19,7 @@ import android.webkit.JavascriptInterface;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -30,7 +31,6 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.core.content.FileProvider;
 
 import java.io.File;
@@ -49,6 +49,7 @@ public class MainActivity extends AppCompatActivity {
     private ValueCallback<Uri[]> filePathCallback;
     private long updateDownloadId = -1L;
     private String pendingUpdateUrl = null;
+    private boolean mainFrameRecovering = false;
 
     private final ActivityResultLauncher<Intent> fileChooser = registerForActivityResult(
         new ActivityResultContracts.StartActivityForResult(),
@@ -96,6 +97,8 @@ public class MainActivity extends AppCompatActivity {
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
         settings.setUserAgentString(CHROME_MOBILE_UA);
+        // Drop a cached login page that still sends sign-in out to Chrome.
+        webView.clearCache(true);
 
         webView.addJavascriptInterface(new NativeBridge(), "WchHrmsApp");
 
@@ -109,30 +112,53 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                if (!request.isForMainFrame()) {
+                    return false;
+                }
                 Uri uri = request.getUrl();
                 String scheme = uri.getScheme() == null ? "" : uri.getScheme();
-                String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase();
 
                 if ("wchhrms".equalsIgnoreCase(scheme)) {
                     handleAppDeepLink(uri);
                     return true;
                 }
 
-                // Keep Google auth from jumping into a blank Chrome tab when possible.
                 if ("intent".equalsIgnoreCase(scheme)) {
                     return handleIntentUrl(view, uri);
                 }
 
-                if (isAppOrGoogleHost(host)) {
+                if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
                     return false;
                 }
 
-                try {
-                    startActivity(new Intent(Intent.ACTION_VIEW, uri));
-                } catch (Exception ignored) {
-                    Toast.makeText(MainActivity.this, "Cannot open link", Toast.LENGTH_SHORT).show();
-                }
                 return true;
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                mainFrameRecovering = false;
+            }
+
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                if (request == null || !request.isForMainFrame()) {
+                    return;
+                }
+                if (mainFrameRecovering) {
+                    mainFrameRecovering = false;
+                    view.post(() -> view.loadDataWithBaseURL(
+                        APP_URL,
+                        "<html><body style=\"font-family:sans-serif;background:#111;color:#fff;display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center;padding:24px\">"
+                            + "<div><p>WCH HRMS could not open this screen.</p>"
+                            + "<p><a style=\"color:#fff\" href=\"" + APP_LOGIN_URL + "\">Try again</a></p></div></body></html>",
+                        "text/html",
+                        "UTF-8",
+                        null
+                    ));
+                    return;
+                }
+                mainFrameRecovering = true;
+                view.post(() -> view.loadUrl(APP_LOGIN_URL));
             }
         });
 
@@ -297,17 +323,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void openGoogleOAuth(String url) {
-        try {
-            CustomTabsIntent tabs = new CustomTabsIntent.Builder()
-                .setShowTitle(true)
-                .setUrlBarHidingEnabled(true)
-                .build();
-            tabs.intent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
-            tabs.launchUrl(this, Uri.parse(url));
-        } catch (Exception e) {
-            // Fallback: keep OAuth inside the WebView.
-            webView.loadUrl(url);
-        }
+        webView.loadUrl(url);
     }
 
     private void startApkUpdate(String url) {
