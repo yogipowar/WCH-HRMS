@@ -31,6 +31,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.core.content.FileProvider;
 
 import java.io.File;
@@ -323,7 +324,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void openGoogleOAuth(String url) {
-        webView.loadUrl(url);
+        try {
+            CustomTabsIntent tabs = new CustomTabsIntent.Builder()
+                .setShowTitle(true)
+                .setUrlBarHidingEnabled(true)
+                .build();
+            tabs.launchUrl(this, Uri.parse(url));
+        } catch (Exception e) {
+            webView.loadUrl(url);
+        }
     }
 
     private void startApkUpdate(String url) {

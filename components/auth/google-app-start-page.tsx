@@ -41,7 +41,10 @@ export function GoogleAppStartPage() {
       setError(null);
       try {
         const deepLink = await handOffToApp(credential);
-        if (!cancelled) setOpenAppHref(deepLink);
+        if (!cancelled) {
+          setOpenAppHref(deepLink);
+          if (deepLink) setMessage("Signed in. Tap the button below to open the app.");
+        }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Could not return to the app.");

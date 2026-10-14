@@ -62,6 +62,7 @@ export function GoogleSignInButton({
   const [enabled, setEnabled] = useState(false);
   const [clientId, setClientId] = useState("");
   const [ready, setReady] = useState(false);
+  const [nativeApp, setNativeApp] = useState(false);
   const onSuccessRef = useRef(onSuccess);
   const onErrorRef = useRef(onError);
 
@@ -82,7 +83,11 @@ export function GoogleSignInButton({
         }
         setEnabled(true);
         setClientId(config.clientId);
-        isNativeAndroidApp();
+        if (isNativeAndroidApp()) {
+          setNativeApp(true);
+          setReady(true);
+          return;
+        }
 
         const existing = document.querySelector<HTMLScriptElement>("script[data-google-gsi]");
         if (existing) return;
@@ -108,7 +113,7 @@ export function GoogleSignInButton({
   }, [enabled, rememberMe]);
 
   useEffect(() => {
-    if (!enabled || !clientId) return;
+    if (!enabled || !clientId || nativeApp) return;
     let cancelled = false;
     const render = () => {
       if (cancelled || !buttonRef.current || !window.google?.accounts?.id) return false;
@@ -143,7 +148,7 @@ export function GoogleSignInButton({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [clientId, enabled]);
+  }, [clientId, enabled, nativeApp]);
 
   if (!enabled) return null;
 
@@ -158,17 +163,36 @@ export function GoogleSignInButton({
         </div>
       </div>
 
-      <div className="relative h-11 w-full">
-        <Button type="button" variant="outline" tabIndex={-1} aria-hidden className="pointer-events-none h-11 w-full shadow-none">
+      {nativeApp ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="h-11 w-full shadow-none"
+          onClick={() => {
+            const startUrl = `${window.location.origin}/auth/google/app-start`;
+            if (typeof window.WchHrmsApp?.startGoogleOAuth === "function") {
+              window.WchHrmsApp.startGoogleOAuth(startUrl);
+              return;
+            }
+            window.location.assign(startUrl);
+          }}
+        >
           <GoogleMark />
           Continue with Google
         </Button>
-        <div
-          ref={buttonRef}
-          className="absolute inset-0 z-10 overflow-hidden opacity-0 [&_.nsm7Bb-HzV7m-LgbsSe]:!h-11 [&_.nsm7Bb-HzV7m-LgbsSe]:!max-w-none [&_.nsm7Bb-HzV7m-LgbsSe]:!w-full"
-        />
-        {!ready ? <span className="sr-only">Loading Google</span> : null}
-      </div>
+      ) : (
+        <div className="relative h-11 w-full">
+          <Button type="button" variant="outline" tabIndex={-1} aria-hidden className="pointer-events-none h-11 w-full shadow-none">
+            <GoogleMark />
+            Continue with Google
+          </Button>
+          <div
+            ref={buttonRef}
+            className="absolute inset-0 z-10 overflow-hidden opacity-0 [&_.nsm7Bb-HzV7m-LgbsSe]:!h-11 [&_.nsm7Bb-HzV7m-LgbsSe]:!max-w-none [&_.nsm7Bb-HzV7m-LgbsSe]:!w-full"
+          />
+          {!ready ? <span className="sr-only">Loading Google</span> : null}
+        </div>
+      )}
     </div>
   );
 }
