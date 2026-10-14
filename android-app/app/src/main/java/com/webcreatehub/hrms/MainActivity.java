@@ -1,7 +1,6 @@
 package com.webcreatehub.hrms;
 
 import android.annotation.SuppressLint;
-import android.Manifest;
 import android.app.DownloadManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -32,8 +31,6 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.browser.customtabs.CustomTabsIntent;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
 import java.io.File;
@@ -535,27 +532,13 @@ public class MainActivity extends AppCompatActivity {
             if (parts == null) {
                 return;
             }
-            runOnUiThread(() -> {
-                ensureReminderPermissions();
-                ClockInReminder.schedule(MainActivity.this, parts[0], parts[1]);
-            });
+            runOnUiThread(() -> ClockInReminder.schedule(MainActivity.this, parts[0], parts[1]));
         }
 
         @JavascriptInterface
         public void markClockedInToday() {
             ClockInReminder.markClockedInToday(MainActivity.this);
         }
-    }
-
-    private void ensureReminderPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-            && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[] { Manifest.permission.POST_NOTIFICATIONS }, 41);
-        }
-        // Do not open the system alarm screen here. On some phones that intent
-        // is handed to Chrome and the employee sees "This page couldn't load"
-        // immediately after login. The reminder still arms with a while-idle alarm.
     }
 
     private static int[] parseClock(String value) {

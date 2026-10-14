@@ -15,6 +15,10 @@ export function ClockInReminderSync() {
     if (!data.ready || user?.role !== "EMPLOYEE") return;
     const schedule = window.WchHrmsApp?.scheduleClockInReminder;
     if (typeof schedule !== "function") return;
+    // Versions before 1.7 open a system screen from this call. On some phones
+    // that screen is Chrome's "This page couldn't load" page, and only employees hit it.
+    const version = Number(window.WchHrmsApp?.getVersionCode?.() || 0);
+    if (version < 8) return;
     const employee = getEmployeeByUser(data, user.id);
     const workStart = employee?.workStartTime || data.settings.workStartTime;
     if (!workStart) return;
