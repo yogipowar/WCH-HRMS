@@ -1,6 +1,6 @@
 {
-  "versionCode": 5,
-  "versionName": "1.4",
+  "versionCode": 6,
+  "versionName": "1.5",
   "apkUrl": "https://hrms.webcreatehub.com/downloads/WCH-HRMS.apk",
-  "message": "A new version of WCH HRMS is available. It reminds you to clock in at your work start time."
+  "message": "A new version of WCH HRMS is available. Sign-in returns to the app instead of an error page."
 }

@@ -2,13 +2,11 @@ package com.webcreatehub.hrms;
 
 import android.annotation.SuppressLint;
 import android.Manifest;
-import android.app.AlarmManager;
 import android.app.DownloadManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
@@ -472,21 +470,9 @@ public class MainActivity extends AppCompatActivity {
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[] { Manifest.permission.POST_NOTIFICATIONS }, 41);
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            AlarmManager alarms = (AlarmManager) getSystemService(ALARM_SERVICE);
-            SharedPreferences prefs = getSharedPreferences(ClockInReminder.PREFS, MODE_PRIVATE);
-            if (alarms != null && !alarms.canScheduleExactAlarms() && !prefs.getBoolean("asked_exact_alarm", false)) {
-                prefs.edit().putBoolean("asked_exact_alarm", true).apply();
-                try {
-                    startActivity(new Intent(
-                        Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
-                        Uri.parse("package:" + getPackageName())
-                    ));
-                } catch (Exception ignored) {
-                    // The reminder still schedules with a while-idle alarm.
-                }
-            }
-        }
+        // Do not open the system alarm screen here. On some phones that intent
+        // is handed to Chrome and the employee sees "This page couldn't load"
+        // immediately after login. The reminder still arms with a while-idle alarm.
     }
 
     private static int[] parseClock(String value) {

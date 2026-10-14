@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BrandLogo } from "@/components/brand/logo";
 import { api } from "@/lib/api/client";
+import { androidAppIntentUrl } from "@/lib/auth/native-return";
 
 async function handOffToApp(credential: string) {
   const res = await fetch("/api/auth/google-handoff", {
@@ -14,9 +15,9 @@ async function handOffToApp(credential: string) {
   if (!res.ok || !data.handoffId) {
     throw new Error(data.error || "Could not prepare app sign-in.");
   }
-  const deepLink = `wchhrms://oauth?handoff=${encodeURIComponent(data.handoffId)}`;
-  window.location.href = deepLink;
-  return deepLink;
+  const intentUrl = androidAppIntentUrl(`handoff=${encodeURIComponent(data.handoffId)}`);
+  window.location.href = intentUrl;
+  return intentUrl;
 }
 
 export function GoogleAppStartPage() {
