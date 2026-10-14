@@ -52,6 +52,11 @@ public class MainActivity extends AppCompatActivity {
     private String pendingUpdateUrl = null;
     private boolean mainFrameRecovering = false;
 
+    private final ActivityResultLauncher<String> notificationPermission = registerForActivityResult(
+        new ActivityResultContracts.RequestPermission(),
+        granted -> { }
+    );
+
     private final ActivityResultLauncher<Intent> fileChooser = registerForActivityResult(
         new ActivityResultContracts.StartActivityForResult(),
         result -> {
@@ -557,13 +562,27 @@ public class MainActivity extends AppCompatActivity {
             if (parts == null) {
                 return;
             }
-            runOnUiThread(() -> ClockInReminder.schedule(MainActivity.this, parts[0], parts[1]));
+            runOnUiThread(() -> {
+                ensureNotificationPermission();
+                ClockInReminder.schedule(MainActivity.this, parts[0], parts[1]);
+            });
         }
 
         @JavascriptInterface
         public void markClockedInToday() {
             ClockInReminder.markClockedInToday(MainActivity.this);
         }
+    }
+
+    /** System permission dialog only. Do not open a settings page; older builds handed that to Chrome. */
+    private void ensureNotificationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return;
+        }
+        if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS);
     }
 
     private static int[] parseClock(String value) {

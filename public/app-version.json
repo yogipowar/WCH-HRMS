@@ -1,6 +1,6 @@
 {
-  "versionCode": 10,
-  "versionName": "1.9",
+  "versionCode": 11,
+  "versionName": "1.10",
   "apkUrl": "https://hrms.webcreatehub.com/downloads/WCH-HRMS.apk",
-  "message": "Employee Google sign-in opens in Chrome, then returns to the app. Install from Chrome if Update fails: https://hrms.webcreatehub.com/downloads/WCH-HRMS.apk"
+  "message": "Clock-in alert at your work start. Allow notifications when the app asks. Install from Chrome if Update fails: https://hrms.webcreatehub.com/downloads/WCH-HRMS.apk"
 }
