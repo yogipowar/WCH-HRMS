@@ -71,13 +71,6 @@ export function GoogleSignInButton({
   }, [onError, onSuccess]);
 
   useEffect(() => {
-    const detect = () => setNativeApp(isNativeAndroidApp());
-    detect();
-    const timer = window.setTimeout(detect, 300);
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
     let cancelled = false;
     void api
       .googleConfig()
