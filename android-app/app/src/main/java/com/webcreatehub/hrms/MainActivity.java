@@ -343,13 +343,12 @@ public class MainActivity extends AppCompatActivity {
     private void startApkUpdate(String url) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
             && !getPackageManager().canRequestPackageInstalls()) {
-            pendingUpdateUrl = url;
+            pendingUpdateUrl = null;
             Toast.makeText(
                 this,
-                "Allow “Install unknown apps” for WCH HRMS, then return here",
+                "Open Chrome and install https://hrms.webcreatehub.com/downloads/WCH-HRMS.apk",
                 Toast.LENGTH_LONG
             ).show();
-            openUnknownSourcesSettings();
             return;
         }
 

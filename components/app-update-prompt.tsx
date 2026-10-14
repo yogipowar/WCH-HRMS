@@ -26,7 +26,6 @@ function readLocalVersionCode() {
 export function AppUpdatePrompt() {
   const [info, setInfo] = useState<AppVersionInfo | null>(null);
   const [localCode, setLocalCode] = useState<number | null>(null);
-  const [busy, setBusy] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
@@ -76,37 +75,16 @@ export function AppUpdatePrompt() {
         <p className="mt-1 text-xs text-muted-foreground">
           Current: {localCode || "older"} → New: {info.versionName} ({info.versionCode})
         </p>
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row-reverse">
-          {localCode >= 7 && typeof window.WchHrmsApp?.openUpdate === "function" ? (
-            <Button
-              className="w-full sm:w-auto"
-              disabled={busy}
-              onClick={() => {
-                setBusy(true);
-                try {
-                  window.WchHrmsApp?.openUpdate?.(info.apkUrl);
-                } finally {
-                  window.setTimeout(() => setBusy(false), 1500);
-                }
-              }}
-            >
-              {busy ? "Starting download…" : "Update app"}
-            </Button>
-          ) : null}
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full sm:w-auto"
-            onClick={() => setDismissed(true)}
-          >
+        <p className="mt-3 text-xs leading-5 text-muted-foreground">
+          Open Chrome and paste this address, then install the file. The Update button inside the app opens an error page.
+          {" "}
+          {info.apkUrl}
+        </p>
+        <div className="mt-4 flex justify-end">
+          <Button type="button" variant="outline" onClick={() => setDismissed(true)}>
             Later
           </Button>
         </div>
-        {localCode < 7 ? (
-          <p className="mt-3 text-xs leading-5 text-muted-foreground">
-            This installed app opens an error page when it tries to update itself. Open Chrome, paste this address, and install the file: {info.apkUrl}
-          </p>
-        ) : null}
       </div>
     </div>
   );
