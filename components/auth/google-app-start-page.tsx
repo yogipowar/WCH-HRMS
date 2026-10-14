@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { BrandLogo } from "@/components/brand/logo";
 import { api } from "@/lib/api/client";
-import { androidAppIntentUrl } from "@/lib/auth/native-return";
 
 async function handOffToApp(credential: string) {
   const res = await fetch("/api/auth/google-handoff", {
@@ -15,9 +14,17 @@ async function handOffToApp(credential: string) {
   if (!res.ok || !data.handoffId) {
     throw new Error(data.error || "Could not prepare app sign-in.");
   }
-  const intentUrl = androidAppIntentUrl(`handoff=${encodeURIComponent(data.handoffId)}`);
-  window.location.href = intentUrl;
-  return intentUrl;
+  try {
+    if (window.WchHrmsApp?.isNativeApp?.()) {
+      window.location.replace(
+        `/auth/google/callback?handoff=${encodeURIComponent(data.handoffId)}&native=1`
+      );
+      return null;
+    }
+  } catch {
+    // Stay on this page and offer the app link.
+  }
+  return `wchhrms://oauth?handoff=${encodeURIComponent(data.handoffId)}`;
 }
 
 export function GoogleAppStartPage() {

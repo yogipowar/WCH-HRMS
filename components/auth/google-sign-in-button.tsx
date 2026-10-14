@@ -49,25 +49,6 @@ function GoogleMark() {
   );
 }
 
-function startRedirectGoogleSignIn(clientId: string) {
-  // APK must use the same GIS flow as the website (JavaScript origin).
-  // Opening Google's /o/oauth2/v2/auth causes redirect_uri_mismatch unless that
-  // URI is registered — GIS on /auth/google/app-start avoids that entirely.
-  void clientId;
-  markNativeApp();
-  const startUrl = `${window.location.origin}/auth/google/app-start`;
-
-  try {
-    if (typeof window.WchHrmsApp?.startGoogleOAuth === "function") {
-      window.WchHrmsApp.startGoogleOAuth(startUrl);
-      return;
-    }
-  } catch {
-    // fall through
-  }
-  window.location.assign(startUrl);
-}
-
 export function GoogleSignInButton({
   rememberMe,
   onSuccess,
@@ -81,7 +62,6 @@ export function GoogleSignInButton({
   const [enabled, setEnabled] = useState(false);
   const [clientId, setClientId] = useState("");
   const [ready, setReady] = useState(false);
-  const [nativeApp, setNativeApp] = useState(false);
   const onSuccessRef = useRef(onSuccess);
   const onErrorRef = useRef(onError);
 
@@ -109,11 +89,7 @@ export function GoogleSignInButton({
         }
         setEnabled(true);
         setClientId(config.clientId);
-
-        if (isNativeAndroidApp()) {
-          setReady(true);
-          return;
-        }
+        isNativeAndroidApp();
 
         const existing = document.querySelector<HTMLScriptElement>("script[data-google-gsi]");
         if (existing) return;
@@ -139,7 +115,7 @@ export function GoogleSignInButton({
   }, [enabled, rememberMe]);
 
   useEffect(() => {
-    if (!enabled || !clientId || nativeApp) return;
+    if (!enabled || !clientId) return;
     let cancelled = false;
     const render = () => {
       if (cancelled || !buttonRef.current || !window.google?.accounts?.id) return false;
@@ -150,6 +126,7 @@ export function GoogleSignInButton({
         },
         auto_select: false,
         cancel_on_tap_outside: true,
+        use_fedcm_for_prompt: false,
       });
       buttonRef.current.innerHTML = "";
       const available = Math.floor(buttonRef.current.clientWidth || buttonRef.current.parentElement?.clientWidth || 0);
@@ -173,7 +150,7 @@ export function GoogleSignInButton({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [clientId, enabled, nativeApp]);
+  }, [clientId, enabled]);
 
   if (!enabled) return null;
 
@@ -188,35 +165,17 @@ export function GoogleSignInButton({
         </div>
       </div>
 
-      {nativeApp ? (
-        <Button
-          type="button"
-          variant="outline"
-          className="h-11 w-full shadow-none"
-          onClick={() => {
-            if (!clientId) {
-              onError("Google Sign-In is not configured.");
-              return;
-            }
-            startRedirectGoogleSignIn(clientId);
-          }}
-        >
+      <div className="relative h-11 w-full">
+        <Button type="button" variant="outline" tabIndex={-1} aria-hidden className="pointer-events-none h-11 w-full shadow-none">
           <GoogleMark />
           Continue with Google
         </Button>
-      ) : (
-        <div className="relative h-11 w-full">
-          <Button type="button" variant="outline" tabIndex={-1} aria-hidden className="pointer-events-none h-11 w-full shadow-none">
-            <GoogleMark />
-            Continue with Google
-          </Button>
-          <div
-            ref={buttonRef}
-            className="absolute inset-0 z-10 overflow-hidden opacity-0 [&_.nsm7Bb-HzV7m-LgbsSe]:!h-11 [&_.nsm7Bb-HzV7m-LgbsSe]:!max-w-none [&_.nsm7Bb-HzV7m-LgbsSe]:!w-full"
-          />
-          {!ready ? <span className="sr-only">Loading Google</span> : null}
-        </div>
-      )}
+        <div
+          ref={buttonRef}
+          className="absolute inset-0 z-10 overflow-hidden opacity-0 [&_.nsm7Bb-HzV7m-LgbsSe]:!h-11 [&_.nsm7Bb-HzV7m-LgbsSe]:!max-w-none [&_.nsm7Bb-HzV7m-LgbsSe]:!w-full"
+        />
+        {!ready ? <span className="sr-only">Loading Google</span> : null}
+      </div>
     </div>
   );
 }

@@ -77,24 +77,22 @@ export function AppUpdatePrompt() {
           Current: {localCode || "older"} → New: {info.versionName} ({info.versionCode})
         </p>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row-reverse">
-          <Button
-            className="w-full sm:w-auto"
-            disabled={busy}
-            onClick={() => {
-              setBusy(true);
-              try {
-                if (typeof window.WchHrmsApp?.openUpdate === "function") {
-                  window.WchHrmsApp.openUpdate(info.apkUrl);
-                } else {
-                  window.location.href = info.apkUrl;
+          {localCode >= 7 && typeof window.WchHrmsApp?.openUpdate === "function" ? (
+            <Button
+              className="w-full sm:w-auto"
+              disabled={busy}
+              onClick={() => {
+                setBusy(true);
+                try {
+                  window.WchHrmsApp?.openUpdate?.(info.apkUrl);
+                } finally {
+                  window.setTimeout(() => setBusy(false), 1500);
                 }
-              } finally {
-                window.setTimeout(() => setBusy(false), 1500);
-              }
-            }}
-          >
-            {busy ? "Starting download…" : "Update app"}
-          </Button>
+              }}
+            >
+              {busy ? "Starting download…" : "Update app"}
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="outline"
@@ -104,6 +102,11 @@ export function AppUpdatePrompt() {
             Later
           </Button>
         </div>
+        {localCode < 7 ? (
+          <p className="mt-3 text-xs leading-5 text-muted-foreground">
+            This installed app opens an error page when it tries to update itself. Open Chrome, paste this address, and install the file: {info.apkUrl}
+          </p>
+        ) : null}
       </div>
     </div>
   );

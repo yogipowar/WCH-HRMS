@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
@@ -36,6 +37,7 @@ import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
 import java.io.File;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
     private static final String APP_HOST = "hrms.webcreatehub.com";
@@ -49,6 +51,7 @@ public class MainActivity extends AppCompatActivity {
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
     private long updateDownloadId = -1L;
+    private String pendingUpdateUrl = null;
 
     private final ActivityResultLauncher<Intent> fileChooser = registerForActivityResult(
         new ActivityResultContracts.StartActivityForResult(),
@@ -284,6 +287,18 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (pendingUpdateUrl != null
+            && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+            && getPackageManager().canRequestPackageInstalls()) {
+            String url = pendingUpdateUrl;
+            pendingUpdateUrl = null;
+            startApkUpdate(url);
+        }
+    }
+
     private void openGoogleOAuth(String url) {
         try {
             CustomTabsIntent tabs = new CustomTabsIntent.Builder()
@@ -301,24 +316,27 @@ public class MainActivity extends AppCompatActivity {
     private void startApkUpdate(String url) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
             && !getPackageManager().canRequestPackageInstalls()) {
+            pendingUpdateUrl = url;
             Toast.makeText(
                 this,
-                "Allow “Install unknown apps” for WCH HRMS, then tap Update again",
+                "Allow “Install unknown apps” for WCH HRMS, then return here",
                 Toast.LENGTH_LONG
             ).show();
-            Intent settings = new Intent(
-                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                Uri.parse("package:" + getPackageName())
-            );
-            startActivity(settings);
+            openUnknownSourcesSettings();
             return;
         }
 
         try {
-            File existing = new File(
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                UPDATE_APK_NAME
-            );
+            File dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+            if (dir == null) {
+                Toast.makeText(this, "Could not start update download", Toast.LENGTH_LONG).show();
+                return;
+            }
+            if (!dir.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                dir.mkdirs();
+            }
+            File existing = new File(dir, UPDATE_APK_NAME);
             if (existing.exists()) {
                 //noinspection ResultOfMethodCallIgnored
                 existing.delete();
@@ -334,13 +352,41 @@ public class MainActivity extends AppCompatActivity {
                 request.addRequestHeader("Cookie", cookie);
             }
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, UPDATE_APK_NAME);
+            request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, UPDATE_APK_NAME);
 
             DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
             updateDownloadId = manager.enqueue(request);
             Toast.makeText(this, "Downloading update…", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
             Toast.makeText(this, "Could not start update download", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void openUnknownSourcesSettings() {
+        Intent intent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+        intent.setData(Uri.parse("package:" + getPackageName()));
+        List<ResolveInfo> matches = getPackageManager().queryIntentActivities(intent, 0);
+        for (ResolveInfo info : matches) {
+            if (info.activityInfo == null) {
+                continue;
+            }
+            String pkg = info.activityInfo.packageName == null ? "" : info.activityInfo.packageName;
+            if (pkg.contains("chrome") || pkg.contains("browser")) {
+                continue;
+            }
+            if (pkg.contains("settings") || pkg.contains("permissioncontroller") || pkg.contains("packageinstaller")) {
+                intent.setClassName(pkg, info.activityInfo.name);
+                break;
+            }
+        }
+        try {
+            startActivity(intent);
+        } catch (Exception e) {
+            Toast.makeText(
+                this,
+                "In Settings, allow Install unknown apps for WCH HRMS, then tap Update again",
+                Toast.LENGTH_LONG
+            ).show();
         }
     }
 
@@ -359,10 +405,12 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        File apk = new File(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-            UPDATE_APK_NAME
-        );
+        File dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        if (dir == null) {
+            Toast.makeText(this, "Update file not found", Toast.LENGTH_LONG).show();
+            return;
+        }
+        File apk = new File(dir, UPDATE_APK_NAME);
         if (!apk.exists()) {
             Toast.makeText(this, "Update file not found", Toast.LENGTH_LONG).show();
             return;
@@ -377,11 +425,46 @@ public class MainActivity extends AppCompatActivity {
         install.setDataAndType(apkUri, "application/vnd.android.package-archive");
         install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         install.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        String installer = resolvePackageInstaller(install);
+        if (installer != null) {
+            install.setPackage(installer);
+            grantUriPermission(installer, apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        }
         try {
             startActivity(install);
         } catch (Exception e) {
             Toast.makeText(this, "Open the downloaded APK from Notifications to install", Toast.LENGTH_LONG).show();
         }
+    }
+
+    private String resolvePackageInstaller(Intent install) {
+        List<ResolveInfo> matches = getPackageManager().queryIntentActivities(install, 0);
+        String[] preferred = new String[] {
+            "com.google.android.packageinstaller",
+            "com.android.packageinstaller",
+            "com.samsung.android.packageinstaller",
+            "com.miui.packageinstaller"
+        };
+        for (String pkg : preferred) {
+            for (ResolveInfo info : matches) {
+                if (info.activityInfo != null && pkg.equals(info.activityInfo.packageName)) {
+                    return pkg;
+                }
+            }
+        }
+        for (ResolveInfo info : matches) {
+            if (info.activityInfo == null || info.activityInfo.packageName == null) {
+                continue;
+            }
+            String pkg = info.activityInfo.packageName;
+            if (pkg.contains("chrome") || pkg.contains("browser")) {
+                continue;
+            }
+            if (pkg.contains("packageinstaller")) {
+                return pkg;
+            }
+        }
+        return null;
     }
 
     private static boolean isAppOrGoogleHost(String host) {

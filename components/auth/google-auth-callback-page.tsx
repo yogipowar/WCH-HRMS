@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/brand/logo";
-import { androidAppIntentUrl } from "@/lib/auth/native-return";
 import { useAuthStore } from "@/lib/stores/auth-store";
 
 function readHashParams() {
@@ -67,12 +66,11 @@ export function GoogleAuthCallbackPage() {
         const data = (await res.json().catch(() => ({}))) as { handoffId?: string; error?: string };
         if (!res.ok || !data.handoffId) {
           setMessage(data.error || "Could not return to the app. Tap below.");
-          setOpenAppHref(androidAppIntentUrl("error=1"));
+          setOpenAppHref("wchhrms://oauth?error=1");
           return;
         }
-        const intentUrl = androidAppIntentUrl(`handoff=${encodeURIComponent(data.handoffId)}`);
-        setOpenAppHref(intentUrl);
-        window.location.href = intentUrl;
+        const deepLink = `wchhrms://oauth?handoff=${encodeURIComponent(data.handoffId)}`;
+        setOpenAppHref(deepLink);
       } catch {
         setMessage("Could not return to the app. Tap below to open WCH HRMS.");
       }
