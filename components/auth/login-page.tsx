@@ -91,6 +91,59 @@ export function LoginPage() {
     router.replace("/dashboard");
   }
 
+  useEffect(() => {
+    if (!isNativeAndroidApp()) return;
+    let stopped = false;
+
+    async function claimPendingGoogleSignIn() {
+      if (stopped || document.visibilityState === "hidden") return;
+      let state = "";
+      try {
+        state = sessionStorage.getItem("wch_google_pending") || "";
+      } catch {
+        return;
+      }
+      if (!state) return;
+      try {
+        const res = await fetch(`/api/auth/google-handoff?id=${encodeURIComponent(state)}`, { cache: "no-store" });
+        if (res.status === 404) return;
+        const data = (await res.json().catch(() => ({}))) as { credential?: string; error?: string };
+        if (!res.ok || !data.credential) {
+          sessionStorage.removeItem("wch_google_pending");
+          setFormError(data.error || "Google Sign-In failed.");
+          return;
+        }
+        sessionStorage.removeItem("wch_google_pending");
+        stopped = true;
+        setGoogleBusy(true);
+        const result = await loginWithGoogle(data.credential, rememberMe);
+        if (!result.ok) {
+          setFormError(result.error || "Google Sign-In failed.");
+          return;
+        }
+        router.replace("/dashboard");
+      } catch {
+        // Keep waiting until the sign-in page finishes.
+      } finally {
+        if (!stopped) setGoogleBusy(false);
+      }
+    }
+
+    const timer = window.setInterval(() => {
+      void claimPendingGoogleSignIn();
+    }, 1000);
+    const onVisible = () => {
+      void claimPendingGoogleSignIn();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    void claimPendingGoogleSignIn();
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [loginWithGoogle, rememberMe, router]);
+
   async function onGoogleCredential(credential: string) {
     setFormError(null);
     setGoogleBusy(true);

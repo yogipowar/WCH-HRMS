@@ -169,7 +169,13 @@ export function GoogleSignInButton({
           variant="outline"
           className="h-11 w-full shadow-none"
           onClick={() => {
-            const startUrl = `${window.location.origin}/auth/google/app-start`;
+            const state = crypto.randomUUID().replace(/-/g, "");
+            try {
+              sessionStorage.setItem("wch_google_pending", state);
+            } catch {
+              // The login page cannot pick the sign-in up without this.
+            }
+            const startUrl = `${window.location.origin}/auth/google/app-start?state=${encodeURIComponent(state)}`;
             if (typeof window.WchHrmsApp?.startGoogleOAuth === "function") {
               window.WchHrmsApp.startGoogleOAuth(startUrl);
               return;

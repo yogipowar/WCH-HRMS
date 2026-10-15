@@ -1007,6 +1007,7 @@ export async function handleApiRequest(request: Request, parts: string[]) {
     if (parts[0] === "auth" && parts[1] === "google-handoff" && request.method === "POST") {
       const body = (await request.json().catch(() => ({}))) as Json;
       const credential = String(body.credential || "").trim();
+      const state = String(body.state || "").trim();
       if (!credential) {
         return jsonResponse(400, { error: "Missing Google credential." });
       }
@@ -1015,7 +1016,7 @@ export async function handleApiRequest(request: Request, parts: string[]) {
       } catch {
         return jsonResponse(401, { error: "Invalid Google credential." });
       }
-      const handoffId = createGoogleHandoff(credential);
+      const handoffId = createGoogleHandoff(credential, state);
       return jsonResponse(200, { handoffId });
     }
 

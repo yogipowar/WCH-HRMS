@@ -9,9 +9,11 @@ function pruneHandoffs() {
   }
 }
 
-export function createGoogleHandoff(credential: string) {
+const STATE_RE = /^[a-zA-Z0-9]{16,64}$/;
+
+export function createGoogleHandoff(credential: string, state?: string) {
   pruneHandoffs();
-  const id = crypto.randomUUID().replace(/-/g, "");
+  const id = state && STATE_RE.test(state) ? state : crypto.randomUUID().replace(/-/g, "");
   handoffs.set(id, { credential, expiresAt: Date.now() + TTL_MS });
   return id;
 }

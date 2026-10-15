@@ -35,7 +35,6 @@ export function GoogleAuthCallbackPage() {
   const router = useRouter();
   const loginWithGoogle = useAuthStore((state) => state.loginWithGoogle);
   const [message, setMessage] = useState("Completing Google Sign-In…");
-  const [openAppHref, setOpenAppHref] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,14 +64,16 @@ export function GoogleAuthCallbackPage() {
         });
         const data = (await res.json().catch(() => ({}))) as { handoffId?: string; error?: string };
         if (!res.ok || !data.handoffId) {
-          setMessage(data.error || "Could not return to the app. Tap below.");
-          setOpenAppHref("wchhrms://oauth?error=1");
+          setMessage(data.error || "Could not finish sign-in. Press Back and try again.");
           return;
         }
-        const deepLink = `wchhrms://oauth?handoff=${encodeURIComponent(data.handoffId)}`;
-        setOpenAppHref(deepLink);
+        const pending = sessionStorage.getItem("wch_google_pending");
+        if (pending && pending !== data.handoffId) {
+          sessionStorage.setItem("wch_google_pending", data.handoffId);
+        }
+        setMessage("Signed in. Press the Back button on your phone to return to WCH HRMS.");
       } catch {
-        setMessage("Could not return to the app. Tap below to open WCH HRMS.");
+        setMessage("Could not finish sign-in. Press Back and try again.");
       }
     }
 
@@ -131,14 +132,6 @@ export function GoogleAuthCallbackPage() {
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-6">
       <BrandLogo priority className="h-10 w-auto max-w-[220px] object-contain" />
       <p className="text-center text-sm text-muted-foreground">{message}</p>
-      {openAppHref ? (
-        <a
-          href={openAppHref}
-          className="mt-2 inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground"
-        >
-          Open WCH HRMS app
-        </a>
-      ) : null}
     </div>
   );
 }

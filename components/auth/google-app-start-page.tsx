@@ -4,50 +4,40 @@ import { useEffect, useRef, useState } from "react";
 import { BrandLogo } from "@/components/brand/logo";
 import { api } from "@/lib/api/client";
 
-async function handOffToApp(credential: string) {
+async function handOffToApp(credential: string, state: string) {
   const res = await fetch("/api/auth/google-handoff", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ credential }),
+    body: JSON.stringify({ credential, state }),
   });
   const data = (await res.json().catch(() => ({}))) as { handoffId?: string; error?: string };
   if (!res.ok || !data.handoffId) {
     throw new Error(data.error || "Could not prepare app sign-in.");
   }
-  try {
-    if (window.WchHrmsApp?.isNativeApp?.()) {
-      window.location.replace(
-        `/auth/google/callback?handoff=${encodeURIComponent(data.handoffId)}&native=1`
-      );
-      return null;
-    }
-  } catch {
-    // Stay on this page and offer the app link.
-  }
-  return `wchhrms://oauth?handoff=${encodeURIComponent(data.handoffId)}`;
 }
 
 export function GoogleAppStartPage() {
   const buttonRef = useRef<HTMLDivElement>(null);
   const [message, setMessage] = useState("Loading Google Sign-In…");
-  const [openAppHref, setOpenAppHref] = useState<string | null>(null);
+  const [signedIn, setSignedIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
     async function onCredential(credential: string) {
-      setMessage("Returning to the HRMS app…");
+      setMessage("Finishing sign-in…");
       setError(null);
+      const state = new URLSearchParams(window.location.search).get("state") || "";
       try {
-        const deepLink = await handOffToApp(credential);
+        await handOffToApp(credential, state);
         if (!cancelled) {
-          setOpenAppHref(deepLink);
-          if (deepLink) setMessage("Signed in. Tap the button below to open the app.");
+          setSignedIn(true);
+          setMessage("Signed in. Press the Back button on your phone to return to WCH HRMS.");
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Could not return to the app.");
+          setError(err instanceof Error ? err.message : "Could not finish sign-in.");
           setMessage("Sign-In almost done");
         }
       }
@@ -129,18 +119,10 @@ export function GoogleAppStartPage() {
             {error}
           </p>
         ) : null}
-        <div ref={buttonRef} className="flex min-h-11 w-full justify-center" />
-        {openAppHref ? (
-          <a
-            href={openAppHref}
-            className="inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground"
-          >
-            Open WCH HRMS app
-          </a>
-        ) : null}
-        <a href="/login?native=1" className="block text-xs text-muted-foreground underline-offset-2 hover:underline">
-          Back to sign in
-        </a>
+        {signedIn ? null : <div ref={buttonRef} className="flex min-h-11 w-full justify-center" />}
+        <p className="text-xs leading-5 text-muted-foreground">
+          Stay on this screen until it says you are signed in, then press Back. Do not open another link.
+        </p>
       </div>
     </div>
   );
