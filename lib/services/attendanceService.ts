@@ -266,11 +266,7 @@ export const attendanceService = {
     return getData().attendanceRecords.find((item) => item.id === id) ?? null;
   },
   clockIn(employeeId: string) {
-    const record = applyAction(employeeId, "CLOCK_IN");
-    if (typeof window !== "undefined") {
-      window.WchHrmsApp?.markClockedInToday?.();
-    }
-    return record;
+    return applyAction(employeeId, "CLOCK_IN");
   },
   clockOut(employeeId: string) {
     return applyAction(employeeId, "CLOCK_OUT");
