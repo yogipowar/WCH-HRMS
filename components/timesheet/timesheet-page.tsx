@@ -3,9 +3,10 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { format, parseISO, startOfMonth, startOfWeek } from "date-fns";
-import { Search, Trash2 } from "lucide-react";
+import { ChevronRight, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { employeeName, formatHours } from "@/components/projects/task-ui";
+import { employeeName } from "@/components/projects/task-ui";
+import type { ProjectTaskTimeEntry } from "@/types";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import { PageHeader } from "@/components/shared/page-header";
 import { LinkButton } from "@/components/shared/link-button";
@@ -274,7 +275,7 @@ export function TimesheetPage() {
                               {selected ? " · Viewing" : ""}
                             </span>
                           </span>
-                          <span className="text-sm font-semibold tabular-nums">{formatHours(person.hours)}h</span>
+                          <span className="text-sm font-semibold tabular-nums">{formatLogged(person.hours)}</span>
                         </button>
                       </li>
                     );
@@ -288,7 +289,7 @@ export function TimesheetPage() {
             <StatCard label="Range" value={rangeStart === rangeEnd ? format(parseISO(rangeStart), "d MMM") : `${format(parseISO(rangeStart), "d MMM")} – ${format(parseISO(rangeEnd), "d MMM")}`} hint={rangeStart === rangeEnd ? format(parseISO(rangeStart), "EEEE yyyy") : "selected dates"} />
             <StatCard label="Logged" value={String(teamLogged)} hint={`of ${teamDay.length} people`} />
             <StatCard label="Entries" value={String(adminEntries.length)} hint="matching this filter" />
-            <StatCard label="Hours" value={`${formatHours(adminHours)}h`} hint="in this filter" />
+            <StatCard label="Hours" value={formatLogged(adminHours)} hint="in this filter" />
           </div>
           <Card>
             <CardHeader>
@@ -302,7 +303,7 @@ export function TimesheetPage() {
                   <div key={item.label} className="space-y-1">
                     <div className="flex items-center justify-between gap-3 text-sm">
                       <span className="truncate">{item.label}</span>
-                      <span className="shrink-0 font-semibold tabular-nums">{formatHours(item.hours)}h</span>
+                      <span className="shrink-0 font-semibold tabular-nums">{formatLogged(item.hours)}</span>
                     </div>
                     <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                       <div
@@ -377,7 +378,7 @@ export function TimesheetPage() {
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
             <StatCard label="Range" value={rangeStart === rangeEnd ? format(parseISO(rangeStart), "d MMM") : `${format(parseISO(rangeStart), "d MMM")} – ${format(parseISO(rangeEnd), "d MMM")}`} hint={rangeStart === rangeEnd ? format(parseISO(rangeStart), "EEEE yyyy") : "selected dates"} />
             <StatCard label="Entries" value={String(myEntries.length)} hint="matching this filter" />
-            <StatCard label="Hours" value={`${formatHours(myHours)}h`} hint="in this filter" />
+            <StatCard label="Hours" value={formatLogged(myHours)} hint="in this filter" />
           </div>
         </>
       )}
@@ -387,63 +388,143 @@ export function TimesheetPage() {
           <CardTitle className="text-base">Filtered entries</CardTitle>
         </CardHeader>
         <CardContent className="px-0">
-          {(isAdmin ? adminEntries : myEntries).length === 0 ? (
-            <p className="px-6 text-sm text-muted-foreground">No work matches this filter.</p>
-          ) : (
-            <ul>
-              {(isAdmin ? adminEntries : myEntries).map((entry) => {
-                const internal = entry.projectId === INTERNAL_OFFICE_ID;
-                const task = entry.taskId ? tasks.find((item) => item.id === entry.taskId) : null;
-                const project = internal
-                  ? null
-                  : (projects.find((item) => item.id === entry.projectId) ?? projects.find((item) => item.id === task?.projectId));
-                const code = task && project ? itemCode(project.serialNo, task, tasks) : project ? projectCode(project.serialNo) : "";
-                const canRemove = isAdmin || entry.employeeId === selfId;
-                return (
-                  <li key={entry.id} className="flex items-start gap-3 border-b px-6 py-4 last:border-b-0">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium">{entry.note || "Work logged"}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {`${format(parseISO(entryWorkDate(entry)), "d MMM")} · `}
-                        {code ? <span className="font-mono">{code}</span> : null}
-                        {internal ? ` ${INTERNAL_OFFICE_LABEL}` : project ? ` ${project.websiteName}` : " Project"}
-                        {task && project ? (
-                          <>
-                            {" · "}
-                            <Link href={`/projects/${project.id}/tasks/${task.id}`} className="hover:underline">
-                              {task.title}
-                            </Link>
-                          </>
-                        ) : null}
-                        {isAdmin ? ` · ${employeeName(employees, entry.employeeId, users)}` : ""}
-                      </p>
-                    </div>
-                    <span className="pt-0.5 text-sm font-semibold">{formatHours(entry.hours)}h</span>
-                    {canRemove ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="text-muted-foreground hover:text-destructive"
-                        aria-label="Remove timesheet entry"
-                        onClick={() => {
-                          void projectTaskService.removeTime(entry.id).catch(async (error: unknown) => {
-                            toast.error(error instanceof Error ? error.message : "Could not remove this entry.");
-                            await useDataStore.getState().hydrateFromApi();
-                          });
-                        }}
-                      >
-                        <Trash2 />
-                      </Button>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+          <TimesheetDays
+            entries={isAdmin ? adminEntries : myEntries}
+            tasks={tasks}
+            projects={projects}
+            employees={employees}
+            users={users}
+            showPerson={isAdmin}
+            selfId={selfId}
+            isAdmin={isAdmin}
+          />
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function formatLogged(hours: number) {
+  const totalMinutes = Math.max(0, Math.round(hours * 60));
+  const wholeHours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (wholeHours === 0) return `${minutes}m`;
+  if (minutes === 0) return `${wholeHours}h`;
+  return `${wholeHours}h ${minutes}m`;
+}
+
+function TimesheetDays({
+  entries,
+  tasks,
+  projects,
+  employees,
+  users,
+  showPerson,
+  selfId,
+  isAdmin,
+}: {
+  entries: ProjectTaskTimeEntry[];
+  tasks: { id: string; projectId: string; title: string; taskNo: number; parentId: string | null }[];
+  projects: { id: string; serialNo: number; websiteName: string }[];
+  employees: Parameters<typeof employeeName>[0];
+  users: Parameters<typeof employeeName>[2];
+  showPerson: boolean;
+  selfId: string;
+  isAdmin: boolean;
+}) {
+  const groups = useMemo(() => {
+    const byDate = new Map<string, ProjectTaskTimeEntry[]>();
+    for (const entry of entries) {
+      const day = entryWorkDate(entry);
+      const rows = byDate.get(day) ?? [];
+      rows.push(entry);
+      byDate.set(day, rows);
+    }
+    return [...byDate.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  }, [entries]);
+  const [openDates, setOpenDates] = useState<Record<string, boolean>>({});
+
+  if (groups.length === 0) {
+    return <p className="px-6 text-sm text-muted-foreground">No work matches this filter.</p>;
+  }
+
+  return (
+    <ul>
+      {groups.map(([day, rows], index) => {
+        const open = openDates[day] ?? index === 0;
+        const total = rows.reduce((sum, entry) => sum + entry.hours, 0);
+        return (
+          <li key={day} className="border-b last:border-b-0">
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 px-6 py-3 text-left hover:bg-muted/50"
+              aria-expanded={open}
+              onClick={() => setOpenDates((current) => ({ ...current, [day]: !open }))}
+            >
+              <ChevronRight className={`size-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`} />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">{format(parseISO(day), "d MMM yyyy")}</span>
+                <span className="block text-xs text-muted-foreground">
+                  {format(parseISO(day), "EEEE")} · {rows.length} {rows.length === 1 ? "task" : "tasks"}
+                </span>
+              </span>
+              <span className="text-sm font-semibold tabular-nums">{formatLogged(total)}</span>
+            </button>
+            {open ? (
+              <ul className="border-t bg-muted/20">
+                {rows.map((entry) => {
+                  const internal = entry.projectId === INTERNAL_OFFICE_ID;
+                  const task = entry.taskId ? tasks.find((item) => item.id === entry.taskId) : null;
+                  const project = internal
+                    ? null
+                    : (projects.find((item) => item.id === entry.projectId) ?? projects.find((item) => item.id === task?.projectId));
+                  const code = task && project ? itemCode(project.serialNo, task, tasks) : project ? projectCode(project.serialNo) : "";
+                  const canRemove = isAdmin || entry.employeeId === selfId;
+                  return (
+                    <li key={entry.id} className="flex items-start gap-3 border-b px-6 py-3 pl-12 last:border-b-0">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium">{entry.note || task?.title || "Work logged"}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {code ? <span className="font-mono">{code}</span> : null}
+                          {internal ? ` ${INTERNAL_OFFICE_LABEL}` : project ? ` ${project.websiteName}` : " Project"}
+                          {task && project ? (
+                            <>
+                              {" · "}
+                              <Link href={`/projects/${project.id}/tasks/${task.id}`} className="hover:underline">
+                                {task.title}
+                              </Link>
+                            </>
+                          ) : null}
+                          {showPerson ? ` · ${employeeName(employees, entry.employeeId, users)}` : ""}
+                        </p>
+                      </div>
+                      <span className="pt-0.5 text-sm font-semibold tabular-nums">{formatLogged(entry.hours)}</span>
+                      {canRemove ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-muted-foreground hover:text-destructive"
+                          aria-label="Remove timesheet entry"
+                          onClick={() => {
+                            void projectTaskService.removeTime(entry.id).catch(async (error: unknown) => {
+                              toast.error(error instanceof Error ? error.message : "Could not remove this entry.");
+                              await useDataStore.getState().hydrateFromApi();
+                            });
+                          }}
+                        >
+                          <Trash2 />
+                        </Button>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

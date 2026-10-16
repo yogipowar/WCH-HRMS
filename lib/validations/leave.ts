@@ -14,6 +14,10 @@ export const leaveFormSchema = z
     message: "End date cannot be before the start date",
     path: ["endDate"],
   })
+  .refine((value) => !value.isHalfDay || value.endDate === value.startDate, {
+    message: "A half day must start and end on the same date",
+    path: ["endDate"],
+  })
   .refine((value) => value.startDate >= todayIsoDate(), {
     message: "Leave date cannot be earlier than today",
     path: ["startDate"],

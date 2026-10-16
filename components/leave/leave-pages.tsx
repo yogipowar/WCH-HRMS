@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -55,6 +55,13 @@ function EmployeeLeave({ employeeId }: { employeeId: string }) {
     defaultValues: { type: "CASUAL", startDate: today, endDate: today, isHalfDay: false, reason: "" },
   });
   const startDate = form.watch("startDate");
+  const isHalfDay = form.watch("isHalfDay");
+
+  useEffect(() => {
+    if (!isHalfDay || !startDate) return;
+    if (form.getValues("endDate") === startDate) return;
+    form.setValue("endDate", startDate, { shouldValidate: true });
+  }, [form, isHalfDay, startDate]);
 
   async function onSubmit(values: LeaveFormValues) {
     setSaving(true);
@@ -140,8 +147,16 @@ function EmployeeLeave({ employeeId }: { employeeId: string }) {
             </div>
             <div>
               <Label>End date</Label>
-              <Input type="date" min={startDate || today} max={currentLeaveYearEnd()} className="mt-1.5" {...form.register("endDate")} />
+              <Input
+                type="date"
+                min={startDate || today}
+                max={currentLeaveYearEnd()}
+                disabled={isHalfDay}
+                className="mt-1.5"
+                {...form.register("endDate")}
+              />
               <FieldError message={form.formState.errors.endDate?.message} />
+              {isHalfDay ? <p className="mt-1.5 text-xs text-muted-foreground">A half day uses the start date only.</p> : null}
             </div>
             <div className="flex h-10 items-center gap-2 md:mt-7">
               <input id="half" type="checkbox" {...form.register("isHalfDay")} />

@@ -44,6 +44,7 @@ export function TimesheetLogForm({
   const [projectId, setProjectId] = useState("");
   const [taskId, setTaskId] = useState("");
   const [hours, setHours] = useState("");
+  const [minutes, setMinutes] = useState("");
   const [note, setNote] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
   const [saving, setSaving] = useState(false);
@@ -64,13 +65,16 @@ export function TimesheetLogForm({
       return [task, ...children];
     });
   }, [selectedProject, tasks]);
-  const logged = Math.min(24, Number(hours));
+  const hourCount = Math.max(0, Math.min(24, Math.floor(Number(hours) || 0)));
+  const minuteCount = Math.max(0, Math.min(59, Math.floor(Number(minutes) || 0)));
+  const logged = Math.round((hourCount + minuteCount / 60) * 100) / 100;
 
   async function addEntry() {
     const nextErrors: FormErrors = {};
     if (showPerson && !personId) nextErrors.person = "Choose a person.";
     if (!internalOffice && !selectedProject) nextErrors.project = "Choose a project.";
-    if (!(logged > 0)) nextErrors.hours = "Enter the hours you worked.";
+    if (!(logged > 0)) nextErrors.hours = "Enter the hours or minutes you worked.";
+    if (logged > 24) nextErrors.hours = "One entry can be at most 24 hours.";
     if (!note.trim()) nextErrors.note = "Describe the work you did.";
     setErrors(nextErrors);
     if (!user || !personId || Object.keys(nextErrors).length > 0 || saving) return;
@@ -85,6 +89,7 @@ export function TimesheetLogForm({
         internalOffice ? INTERNAL_OFFICE_ID : selectedProject?.id,
       );
       setHours("");
+      setMinutes("");
       setNote("");
       setTaskId("");
       toast.success("Timesheet updated.");
@@ -127,7 +132,7 @@ export function TimesheetLogForm({
           <FieldError message={errors.person} />
         </div>
       ) : null}
-      <div className={`${formWideClass} grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)_minmax(0,1.25fr)_minmax(7.5rem,0.7fr)]`}>
+      <div className={`${formWideClass} grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)_minmax(0,1.25fr)_minmax(10rem,0.85fr)]`}>
         {showDate ? (
           <div>
             <Label>
@@ -178,22 +183,38 @@ export function TimesheetLogForm({
         </div>
         <div>
           <Label>
-            Hours <span className="text-destructive">*</span>
+            Time <span className="text-destructive">*</span>
           </Label>
-          <Input
-            type="number"
-            min={0.5}
-            max={24}
-            step="0.5"
-            required
-            value={hours}
-            placeholder="0.0"
-            className="mt-1.5"
-            onChange={(event) => {
-              setHours(event.target.value);
-              setErrors((current) => ({ ...current, hours: undefined }));
-            }}
-          />
+          <div className="mt-1.5 grid grid-cols-2 gap-2">
+            <Input
+              type="number"
+              min={0}
+              max={24}
+              step={1}
+              inputMode="numeric"
+              value={hours}
+              placeholder="Hours"
+              aria-label="Hours"
+              onChange={(event) => {
+                setHours(event.target.value);
+                setErrors((current) => ({ ...current, hours: undefined }));
+              }}
+            />
+            <Input
+              type="number"
+              min={0}
+              max={59}
+              step={1}
+              inputMode="numeric"
+              value={minutes}
+              placeholder="Min"
+              aria-label="Minutes"
+              onChange={(event) => {
+                setMinutes(event.target.value);
+                setErrors((current) => ({ ...current, hours: undefined }));
+              }}
+            />
+          </div>
           <FieldError message={errors.hours} />
         </div>
       </div>
