@@ -7,7 +7,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
@@ -19,7 +18,6 @@ import android.webkit.JavascriptInterface;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
-import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -35,7 +33,6 @@ import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.core.content.FileProvider;
 
 import java.io.File;
-import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
     private static final String APP_HOST = "hrms.webcreatehub.com";
@@ -49,13 +46,6 @@ public class MainActivity extends AppCompatActivity {
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
     private long updateDownloadId = -1L;
-    private String pendingUpdateUrl = null;
-    private boolean mainFrameRecovering = false;
-
-    private final ActivityResultLauncher<String> notificationPermission = registerForActivityResult(
-        new ActivityResultContracts.RequestPermission(),
-        granted -> { }
-    );
 
     private final ActivityResultLauncher<Intent> fileChooser = registerForActivityResult(
         new ActivityResultContracts.StartActivityForResult(),
@@ -103,8 +93,6 @@ public class MainActivity extends AppCompatActivity {
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
         settings.setUserAgentString(CHROME_MOBILE_UA);
-        // Drop a cached login page that still sends sign-in out to Chrome.
-        webView.clearCache(true);
 
         webView.addJavascriptInterface(new NativeBridge(), "WchHrmsApp");
 
@@ -118,53 +106,30 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                if (!request.isForMainFrame()) {
-                    return false;
-                }
                 Uri uri = request.getUrl();
                 String scheme = uri.getScheme() == null ? "" : uri.getScheme();
+                String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase();
 
                 if ("wchhrms".equalsIgnoreCase(scheme)) {
                     handleAppDeepLink(uri);
                     return true;
                 }
 
+                // Keep Google auth from jumping into a blank Chrome tab when possible.
                 if ("intent".equalsIgnoreCase(scheme)) {
                     return handleIntentUrl(view, uri);
                 }
 
-                if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
+                if (isAppOrGoogleHost(host)) {
                     return false;
                 }
 
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, uri));
+                } catch (Exception ignored) {
+                    Toast.makeText(MainActivity.this, "Cannot open link", Toast.LENGTH_SHORT).show();
+                }
                 return true;
-            }
-
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                mainFrameRecovering = false;
-            }
-
-            @Override
-            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-                if (request == null || !request.isForMainFrame()) {
-                    return;
-                }
-                if (mainFrameRecovering) {
-                    mainFrameRecovering = false;
-                    view.post(() -> view.loadDataWithBaseURL(
-                        APP_URL,
-                        "<html><body style=\"font-family:sans-serif;background:#111;color:#fff;display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center;padding:24px\">"
-                            + "<div><p>WCH HRMS could not open this screen.</p>"
-                            + "<p><a style=\"color:#fff\" href=\"" + APP_LOGIN_URL + "\">Try again</a></p></div></body></html>",
-                        "text/html",
-                        "UTF-8",
-                        null
-                    ));
-                    return;
-                }
-                mainFrameRecovering = true;
-                view.post(() -> view.loadUrl(APP_LOGIN_URL));
             }
         });
 
@@ -316,26 +281,16 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (pendingUpdateUrl != null
-            && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
-            && getPackageManager().canRequestPackageInstalls()) {
-            String url = pendingUpdateUrl;
-            pendingUpdateUrl = null;
-            startApkUpdate(url);
-        }
-    }
-
     private void openGoogleOAuth(String url) {
         try {
             CustomTabsIntent tabs = new CustomTabsIntent.Builder()
                 .setShowTitle(true)
                 .setUrlBarHidingEnabled(true)
                 .build();
+            tabs.intent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
             tabs.launchUrl(this, Uri.parse(url));
         } catch (Exception e) {
+            // Fallback: keep OAuth inside the WebView.
             webView.loadUrl(url);
         }
     }
@@ -343,26 +298,24 @@ public class MainActivity extends AppCompatActivity {
     private void startApkUpdate(String url) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
             && !getPackageManager().canRequestPackageInstalls()) {
-            pendingUpdateUrl = null;
             Toast.makeText(
                 this,
-                "Open Chrome and install https://hrms.webcreatehub.com/downloads/WCH-HRMS.apk",
+                "Allow “Install unknown apps” for WCH HRMS, then tap Update again",
                 Toast.LENGTH_LONG
             ).show();
+            Intent settings = new Intent(
+                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                Uri.parse("package:" + getPackageName())
+            );
+            startActivity(settings);
             return;
         }
 
         try {
-            File dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
-            if (dir == null) {
-                Toast.makeText(this, "Could not start update download", Toast.LENGTH_LONG).show();
-                return;
-            }
-            if (!dir.exists()) {
-                //noinspection ResultOfMethodCallIgnored
-                dir.mkdirs();
-            }
-            File existing = new File(dir, UPDATE_APK_NAME);
+            File existing = new File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                UPDATE_APK_NAME
+            );
             if (existing.exists()) {
                 //noinspection ResultOfMethodCallIgnored
                 existing.delete();
@@ -378,41 +331,13 @@ public class MainActivity extends AppCompatActivity {
                 request.addRequestHeader("Cookie", cookie);
             }
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, UPDATE_APK_NAME);
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, UPDATE_APK_NAME);
 
             DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
             updateDownloadId = manager.enqueue(request);
             Toast.makeText(this, "Downloading update…", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
             Toast.makeText(this, "Could not start update download", Toast.LENGTH_LONG).show();
-        }
-    }
-
-    private void openUnknownSourcesSettings() {
-        Intent intent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
-        intent.setData(Uri.parse("package:" + getPackageName()));
-        List<ResolveInfo> matches = getPackageManager().queryIntentActivities(intent, 0);
-        for (ResolveInfo info : matches) {
-            if (info.activityInfo == null) {
-                continue;
-            }
-            String pkg = info.activityInfo.packageName == null ? "" : info.activityInfo.packageName;
-            if (pkg.contains("chrome") || pkg.contains("browser")) {
-                continue;
-            }
-            if (pkg.contains("settings") || pkg.contains("permissioncontroller") || pkg.contains("packageinstaller")) {
-                intent.setClassName(pkg, info.activityInfo.name);
-                break;
-            }
-        }
-        try {
-            startActivity(intent);
-        } catch (Exception e) {
-            Toast.makeText(
-                this,
-                "In Settings, allow Install unknown apps for WCH HRMS, then tap Update again",
-                Toast.LENGTH_LONG
-            ).show();
         }
     }
 
@@ -431,12 +356,10 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        File dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
-        if (dir == null) {
-            Toast.makeText(this, "Update file not found", Toast.LENGTH_LONG).show();
-            return;
-        }
-        File apk = new File(dir, UPDATE_APK_NAME);
+        File apk = new File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            UPDATE_APK_NAME
+        );
         if (!apk.exists()) {
             Toast.makeText(this, "Update file not found", Toast.LENGTH_LONG).show();
             return;
@@ -451,46 +374,11 @@ public class MainActivity extends AppCompatActivity {
         install.setDataAndType(apkUri, "application/vnd.android.package-archive");
         install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         install.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        String installer = resolvePackageInstaller(install);
-        if (installer != null) {
-            install.setPackage(installer);
-            grantUriPermission(installer, apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        }
         try {
             startActivity(install);
         } catch (Exception e) {
             Toast.makeText(this, "Open the downloaded APK from Notifications to install", Toast.LENGTH_LONG).show();
         }
-    }
-
-    private String resolvePackageInstaller(Intent install) {
-        List<ResolveInfo> matches = getPackageManager().queryIntentActivities(install, 0);
-        String[] preferred = new String[] {
-            "com.google.android.packageinstaller",
-            "com.android.packageinstaller",
-            "com.samsung.android.packageinstaller",
-            "com.miui.packageinstaller"
-        };
-        for (String pkg : preferred) {
-            for (ResolveInfo info : matches) {
-                if (info.activityInfo != null && pkg.equals(info.activityInfo.packageName)) {
-                    return pkg;
-                }
-            }
-        }
-        for (ResolveInfo info : matches) {
-            if (info.activityInfo == null || info.activityInfo.packageName == null) {
-                continue;
-            }
-            String pkg = info.activityInfo.packageName;
-            if (pkg.contains("chrome") || pkg.contains("browser")) {
-                continue;
-            }
-            if (pkg.contains("packageinstaller")) {
-                return pkg;
-            }
-        }
-        return null;
     }
 
     private static boolean isAppOrGoogleHost(String host) {
@@ -553,54 +441,6 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
             runOnUiThread(() -> openGoogleOAuth(url.trim()));
-        }
-
-        @JavascriptInterface
-        public void scheduleClockInReminder(String workStart) {
-            int[] parts = parseClock(workStart);
-            if (parts == null) {
-                return;
-            }
-            runOnUiThread(() -> {
-                ensureNotificationPermission();
-                ClockInReminder.schedule(MainActivity.this, parts[0], parts[1]);
-            });
-        }
-
-        @JavascriptInterface
-        public void markClockedInToday() {
-            ClockInReminder.markClockedInToday(MainActivity.this);
-        }
-    }
-
-    /** System permission dialog only. Do not open a settings page; older builds handed that to Chrome. */
-    private void ensureNotificationPermission() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            return;
-        }
-        if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-        notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS);
-    }
-
-    private static int[] parseClock(String value) {
-        if (value == null) {
-            return null;
-        }
-        String[] parts = value.trim().split(":");
-        if (parts.length < 2) {
-            return null;
-        }
-        try {
-            int hour = Integer.parseInt(parts[0]);
-            int minute = Integer.parseInt(parts[1]);
-            if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
-                return null;
-            }
-            return new int[] { hour, minute };
-        } catch (NumberFormatException ignored) {
-            return null;
         }
     }
 

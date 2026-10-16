@@ -1,6 +1,6 @@
 {
-  "versionCode": 11,
-  "versionName": "1.10",
+  "versionCode": 4,
+  "versionName": "1.3",
   "apkUrl": "https://hrms.webcreatehub.com/downloads/WCH-HRMS.apk",
-  "message": "Clock-in alert at your work start. Allow notifications when the app asks. Install from Chrome if Update fails: https://hrms.webcreatehub.com/downloads/WCH-HRMS.apk"
+  "message": "A new version of WCH HRMS is available."
 }
