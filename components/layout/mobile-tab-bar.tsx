@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutGrid } from "lucide-react";
 import { NAV_ICONS } from "@/components/layout/nav-config";
+import { NavCount } from "@/components/layout/nav-count";
+import { useNavBadges } from "@/components/layout/use-nav-badges";
 import {
   Sheet,
   SheetContent,
@@ -58,8 +60,10 @@ function mobileNavForRole(role: UserRole): {
 
 export function MobileTabBar({ role }: { role: UserRole }) {
   const pathname = usePathname();
+  const badges = useNavBadges();
   const [moreOpen, setMoreOpen] = useState(false);
   const { tabs, moreSections, moreHrefs, moreDescription, ariaLabel } = mobileNavForRole(role);
+  const moreCount = moreHrefs.reduce((sum, href) => sum + (badges.get(href) ?? 0), 0);
   const moreActive = useMemo(
     () => moreHrefs.some((href) => isActivePath(pathname, href)),
     [moreHrefs, pathname],
@@ -86,7 +90,10 @@ export function MobileTabBar({ role }: { role: UserRole }) {
                     active ? "font-semibold text-primary" : "text-muted-foreground",
                   )}
                 >
-                  {Icon ? <Icon className="size-5 shrink-0" aria-hidden /> : null}
+                  <span className="relative">
+                    {Icon ? <Icon className="size-5 shrink-0" aria-hidden /> : null}
+                    <NavCount count={badges.get(item.href) ?? 0} className="absolute -top-2 -right-3 h-4 min-w-4 px-1" />
+                  </span>
                   <span className="truncate">{item.title}</span>
                 </Link>
               </li>
@@ -103,7 +110,10 @@ export function MobileTabBar({ role }: { role: UserRole }) {
                 moreActive || moreOpen ? "font-semibold text-primary" : "text-muted-foreground",
               )}
             >
-              <LayoutGrid className="size-5 shrink-0" aria-hidden />
+              <span className="relative">
+                <LayoutGrid className="size-5 shrink-0" aria-hidden />
+                <NavCount count={moreCount} className="absolute -top-2 -right-3 h-4 min-w-4 px-1" />
+              </span>
               <span className="truncate">More</span>
             </button>
           </li>
@@ -148,11 +158,12 @@ export function MobileTabBar({ role }: { role: UserRole }) {
                       >
                         <span
                           className={cn(
-                            "flex size-10 items-center justify-center rounded-xl",
+                            "relative flex size-10 items-center justify-center rounded-xl",
                             active ? "bg-primary/15" : "bg-background",
                           )}
                         >
                           {Icon ? <Icon className="size-5" aria-hidden /> : null}
+                          <NavCount count={badges.get(item.href) ?? 0} className="absolute -top-1 -right-1 h-4 min-w-4 px-1" />
                         </span>
                         <span className="text-[11px] leading-tight font-medium">{item.title}</span>
                       </Link>

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_ICONS } from "@/components/layout/nav-config";
+import { NavCount } from "@/components/layout/nav-count";
+import { useNavBadges } from "@/components/layout/use-nav-badges";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { navigationForRole, type AppNavItem } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -37,6 +39,7 @@ function groupNav(items: AppNavItem[]) {
 
 export function SidebarNav({ role, onNavigate, collapsed = false }: SidebarNavProps) {
   const pathname = usePathname();
+  const badges = useNavBadges();
   const groups = groupNav(navigationForRole(role));
 
   return (
@@ -51,8 +54,9 @@ export function SidebarNav({ role, onNavigate, collapsed = false }: SidebarNavPr
           {group.items.map((item) => {
             const Icon = NAV_ICONS[item.icon];
             const active = isActivePath(pathname, item.href);
+            const count = badges.get(item.href) ?? 0;
             const className = cn(
-              "flex items-center rounded-lg text-[13px] transition-colors",
+              "relative flex items-center rounded-lg text-[13px] transition-colors",
               collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5",
               active
                 ? "bg-sidebar-accent font-medium text-foreground"
@@ -63,7 +67,8 @@ export function SidebarNav({ role, onNavigate, collapsed = false }: SidebarNavPr
               return (
                 <Link key={item.href} href={item.href} onClick={onNavigate} className={className}>
                   {Icon ? <Icon className="size-[18px] shrink-0" aria-hidden /> : null}
-                  {item.title}
+                  <span className="min-w-0 flex-1 truncate">{item.title}</span>
+                  <NavCount count={count} />
                 </Link>
               );
             }
@@ -72,11 +77,19 @@ export function SidebarNav({ role, onNavigate, collapsed = false }: SidebarNavPr
               <Tooltip key={item.href}>
                 <TooltipTrigger
                   delay={0}
-                  render={<Link href={item.href} onClick={onNavigate} className={className} aria-label={item.title} />}
+                  render={
+                    <Link
+                      href={item.href}
+                      onClick={onNavigate}
+                      className={className}
+                      aria-label={count > 0 ? `${item.title}, ${count} new` : item.title}
+                    />
+                  }
                 >
                   {Icon ? <Icon className="size-[18px] shrink-0" aria-hidden /> : null}
+                  <NavCount count={count} className="absolute top-1 right-1 h-4 min-w-4 px-1" />
                 </TooltipTrigger>
-                <TooltipContent side="right">{item.title}</TooltipContent>
+                <TooltipContent side="right">{count > 0 ? `${item.title} (${count})` : item.title}</TooltipContent>
               </Tooltip>
             );
           })}
