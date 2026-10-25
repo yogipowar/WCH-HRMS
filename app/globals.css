@@ -485,6 +485,13 @@ html.dark[data-theme] {
   body {
     @apply bg-background text-foreground antialiased;
   }
+
+  /* Native menus stay light on Windows. Dark-theme text would otherwise disappear on that white list. */
+  select option,
+  select optgroup {
+    background-color: #ffffff;
+    color: #111827;
+  }
 }
 
 @layer utilities {
