@@ -6,7 +6,7 @@ import { format } from "date-fns";
 import { Calendar, Flag, LayoutGrid, List, MessageSquare, Plus, Search, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
-import { AssigneeStack, assignablePeople, formatHours, PRIORITY_COLOR, shortDate, StatusDot, StatusMenu } from "@/components/projects/task-ui";
+import { AssigneeStack, assignablePeople, formatHours, personName, PRIORITY_COLOR, shortDate, StatusDot, StatusMenu } from "@/components/projects/task-ui";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -29,7 +29,7 @@ import { cn } from "cn";
 import type { Employee, Project, ProjectTask, TaskStatus, User } from "@/types";
 import { TASK_STATUS_LABELS } from "@/types";
 
-const COLUMNS: TaskStatus[] = ["TODO", "IN_PROGRESS", "IN_REVIEW", "REOPEN", "DONE"];
+const COLUMNS: TaskStatus[] = ["TODO", "IN_PROGRESS", "IN_REVIEW", "REOPEN", "ISSUE", "DONE"];
 
 function isStatus(value: string | null | undefined): value is TaskStatus {
   return COLUMNS.includes(value as TaskStatus);
@@ -357,6 +357,7 @@ export function ProjectBoard({ project }: { project: Project }) {
                       )}
                       code={itemCode(project.serialNo, task, projectTasks)}
                       assigneeIds={task.assigneeIds ?? []}
+                      createdBy={personName(users, employees, task.createdBy)}
                       employees={employees}
                       users={users}
                       overdue={Boolean(task.endDate && task.endDate < today && task.status !== "DONE")}
@@ -416,7 +417,12 @@ export function ProjectBoard({ project }: { project: Project }) {
                         <span className="shrink-0 font-mono text-[11px] font-medium text-muted-foreground">
                           {itemCode(project.serialNo, task, projectTasks)}
                         </span>
-                        <span className="truncate text-sm font-medium">{task.title}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">{task.title}</span>
+                          <span className="block truncate text-[11px] text-muted-foreground">
+                            Created by {personName(users, employees, task.createdBy)}
+                          </span>
+                        </span>
                       </Link>
                       <Flag className="size-3.5 shrink-0" style={{ color: PRIORITY_COLOR[task.priority] }} />
                       {subtasks.length > 0 ? (
@@ -492,6 +498,7 @@ function TaskCard({
   spent,
   code,
   assigneeIds,
+  createdBy,
   employees,
   users,
   overdue,
@@ -506,6 +513,7 @@ function TaskCard({
   spent: number;
   code: string;
   assigneeIds: string[];
+  createdBy: string;
   employees: Employee[];
   users: User[];
   overdue: boolean;
@@ -528,6 +536,7 @@ function TaskCard({
           <span className="mr-1.5 font-mono text-[11px] font-medium text-muted-foreground">{code}</span>
           {task.title}
         </p>
+        <p className="mt-1 text-[11px] text-muted-foreground">Created by {createdBy}</p>
       </Link>
       <div className="mt-2 flex items-center gap-2 text-muted-foreground">
         <StatusMenu status={task.status} onChange={onStatus} label={`Status for ${task.title}`} />

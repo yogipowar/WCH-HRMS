@@ -20,10 +20,15 @@ export default function Page({
   const statusParam = Array.isArray(query.status) ? query.status[0] : query.status;
   const parentParam = Array.isArray(query.parent) ? query.parent[0] : query.parent;
   const user = useAuthStore((state) => state.user);
+  const ready = useDataStore((state) => state.ready);
   const project = useDataStore((state) => state.projects?.find((item) => item.id === id));
   const parent = useDataStore((state) =>
     parentParam ? state.projectTasks?.find((item) => item.id === parentParam && item.projectId === id && !item.parentId) : null,
   );
+
+  if (!ready) {
+    return null;
+  }
 
   if (!project) {
     notFound();

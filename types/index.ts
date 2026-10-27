@@ -322,7 +322,7 @@ export interface Project {
   updatedAt: string;
 }
 
-export const TASK_STATUSES = ["TODO", "IN_PROGRESS", "IN_REVIEW", "REOPEN", "DONE"] as const;
+export const TASK_STATUSES = ["TODO", "IN_PROGRESS", "IN_REVIEW", "REOPEN", "ISSUE", "DONE"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
@@ -330,6 +330,7 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   IN_PROGRESS: "In progress",
   IN_REVIEW: "In review",
   REOPEN: "Reopen",
+  ISSUE: "Issue / Bug",
   DONE: "Done",
 };
 

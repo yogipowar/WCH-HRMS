@@ -112,6 +112,9 @@ export function TaskPage({ project, taskId }: { project: Project; taskId: string
             <p className="mb-3 font-mono text-xs font-medium tracking-wide text-muted-foreground">
               {task.parentId ? "Subtask ID" : "Task ID"} {itemCode(project.serialNo, task, tasks)}
             </p>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Created by {personName(users, employees, task.createdBy)}
+            </p>
             <StatusMenu prominent status={task.status} onChange={(status) => saveFields({ status })} />
             <input
               value={title}
@@ -221,7 +224,12 @@ export function TaskPage({ project, taskId }: { project: Project; taskId: string
                         <span className="shrink-0 font-mono text-[11px] font-medium text-muted-foreground no-underline">
                           {itemCode(project.serialNo, item, tasks)}
                         </span>
-                        <span className="truncate text-sm font-medium">{item.title}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">{item.title}</span>
+                          <span className="block truncate text-[11px] text-muted-foreground no-underline">
+                            Created by {personName(users, employees, item.createdBy)}
+                          </span>
+                        </span>
                       </Link>
                       <AssigneeStack employees={employees} users={users} ids={item.assigneeIds ?? []} size="size-5" />
                     </li>
@@ -404,6 +412,7 @@ export function TaskPage({ project, taskId }: { project: Project; taskId: string
         <aside className="space-y-5 rounded-2xl border bg-card p-5 shadow-sm lg:sticky lg:top-4">
           <div className="space-y-2">
             <h2 className="text-sm font-semibold">People</h2>
+            <Prop label="Created by">{personName(users, employees, task.createdBy)}</Prop>
             <AssigneePicker
               members={members}
               value={assigneeIds}

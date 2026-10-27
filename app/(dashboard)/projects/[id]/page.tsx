@@ -10,7 +10,12 @@ import { useDataStore } from "@/lib/stores/data-store";
 export default function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const user = useAuthStore((state) => state.user);
+  const ready = useDataStore((state) => state.ready);
   const project = useDataStore((state) => state.projects?.find((item) => item.id === id));
+
+  if (!ready) {
+    return null;
+  }
 
   if (!project) {
     notFound();
