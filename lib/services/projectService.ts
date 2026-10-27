@@ -40,7 +40,7 @@ export const projectService = {
     void api.createProject(project);
     return project;
   },
-  updateProject(id: string, patch: Partial<Omit<Project, "id" | "createdAt">>) {
+  async updateProject(id: string, patch: Partial<Omit<Project, "id" | "createdAt">>) {
     const now = new Date().toISOString();
     updateData((data) => ({
       projects: (data.projects ?? []).map((item) =>
@@ -48,7 +48,7 @@ export const projectService = {
       ),
     }));
     const project = getData().projects?.find((item) => item.id === id);
-    if (project) void api.updateProject(id, project);
+    if (project) await api.updateProject(id, project);
   },
   deleteProject(id: string) {
     updateData((data) => {

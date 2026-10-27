@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
-import { Calendar, Flag, LayoutGrid, List, MessageSquare, Plus, Search } from "lucide-react";
+import { Calendar, Flag, LayoutGrid, List, MessageSquare, Plus, Search, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import { AssigneeStack, assignablePeople, formatHours, PRIORITY_COLOR, shortDate, StatusDot, StatusMenu } from "@/components/projects/task-ui";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Popover, PopoverContent, PopoverHeader, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { itemCode, projectCode } from "@/lib/projects/codes";
 import {
@@ -75,7 +76,12 @@ export function ProjectBoard({ project }: { project: Project }) {
   const totalSpent = projectTime.reduce((sum, item) => sum + item.hours, 0);
   const totalPlanned = projectTasks.reduce((sum, item) => sum + item.durationHours, 0);
   const status = asProjectStatus(project.status);
-  const canChangeStatus = user?.role === "MANAGEMENT" || Boolean(user?.employeeId && user.employeeId === project.projectManagerId);
+  const isAdmin = user?.role === "MANAGEMENT";
+  const canChangeStatus = isAdmin || Boolean(user?.employeeId && user.employeeId === project.projectManagerId);
+  const activeEmployees = useMemo(
+    () => employees.filter((item) => item.status === "ACTIVE").sort((a, b) => a.fullName.localeCompare(b.fullName)),
+    [employees],
+  );
   const requirements = knownRequirementIds(project.requirementIds ?? []);
   const completed = new Set(knownRequirementIds(project.completedRequirementIds ?? []));
   const requirementItems = PROJECT_REQUIREMENTS.filter((item) => requirements.includes(item.id));
@@ -188,11 +194,18 @@ export function ProjectBoard({ project }: { project: Project }) {
             )}
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">
-          {formatHours(totalSpent)}h tracked
-          <span className="px-1.5">·</span>
-          {formatHours(totalPlanned)}h planned
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          {isAdmin ? (
+            <Link href={`/projects/${project.id}/edit`} className={buttonVariants({ size: "sm", variant: "outline" })}>
+              Edit project
+            </Link>
+          ) : null}
+          <p className="text-xs text-muted-foreground">
+            {formatHours(totalSpent)}h tracked
+            <span className="px-1.5">·</span>
+            {formatHours(totalPlanned)}h planned
+          </p>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -224,6 +237,15 @@ export function ProjectBoard({ project }: { project: Project }) {
               <EmployeeAvatar employee={member} className="size-7" />
             </button>
           ))}
+          {isAdmin ? (
+            <ProjectTeamEditor
+              project={project}
+              employees={activeEmployees}
+              onSave={(teamMemberIds) =>
+                void run(() => projectService.updateProject(project.id, { teamMemberIds }), "Team updated.")
+              }
+            />
+          ) : null}
         </div>
       </div>
 
@@ -542,5 +564,93 @@ function AddTaskLink({ href }: { href: string }) {
       <Plus className="size-3.5" />
       Add Task
     </Link>
+  );
+}
+
+function ProjectTeamEditor({
+  project,
+  employees,
+  onSave,
+}: {
+  project: Project;
+  employees: Employee[];
+  onSave: (teamMemberIds: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(project.teamMemberIds);
+
+  useEffect(() => {
+    if (open) setDraft(project.teamMemberIds);
+  }, [open, project.teamMemberIds]);
+
+  function toggle(employeeId: string) {
+    if (project.projectManagerId === employeeId) return;
+    setDraft((current) =>
+      current.includes(employeeId) ? current.filter((id) => id !== employeeId) : [...current, employeeId],
+    );
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        type="button"
+        className="inline-flex size-7 items-center justify-center rounded-full border border-dashed text-muted-foreground hover:border-primary hover:text-primary"
+        aria-label="Add team members"
+        title="Add team members"
+      >
+        <UserPlus className="size-3.5" />
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-0" align="end">
+        <PopoverHeader className="border-b px-3 py-2">
+          <PopoverTitle className="text-sm">Team members</PopoverTitle>
+        </PopoverHeader>
+        <div className="max-h-64 space-y-1 overflow-y-auto p-2">
+          {employees.length === 0 ? (
+            <p className="px-2 py-3 text-sm text-muted-foreground">No active employees available.</p>
+          ) : (
+            employees.map((employee) => {
+              const isPm = project.projectManagerId === employee.id;
+              const checked = isPm || draft.includes(employee.id);
+              return (
+                <label
+                  key={employee.id}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/70",
+                    isPm && "cursor-default opacity-80",
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={isPm}
+                    onChange={() => toggle(employee.id)}
+                  />
+                  <EmployeeAvatar employee={employee} className="size-6" />
+                  <span className="min-w-0 flex-1 truncate">
+                    {employee.fullName}
+                    {isPm ? " (manager)" : ""}
+                  </span>
+                </label>
+              );
+            })
+          )}
+        </div>
+        <div className="flex justify-end gap-2 border-t px-3 py-2">
+          <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => {
+              onSave(draft.filter((id) => id !== project.projectManagerId));
+              setOpen(false);
+            }}
+          >
+            Save team
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
