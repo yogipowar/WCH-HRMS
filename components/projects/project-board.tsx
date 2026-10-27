@@ -343,6 +343,14 @@ export function ProjectBoard({ project }: { project: Project }) {
                   <StatusDot status={status} />
                   <h2 className="text-sm font-semibold">{TASK_STATUS_LABELS[status]}</h2>
                   <span className="text-xs text-muted-foreground">{columnTasks.length}</span>
+                  <Link
+                    href={`/projects/${project.id}/tasks/new?status=${status}`}
+                    className="ml-auto inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-muted-foreground hover:bg-background/80 hover:text-foreground"
+                    aria-label={`Add task to ${TASK_STATUS_LABELS[status]}`}
+                  >
+                    <Plus className="size-3.5" />
+                    Add task
+                  </Link>
                 </header>
                 <div className="space-y-2">
                   {columnTasks.map((task) => (
