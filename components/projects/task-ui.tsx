@@ -7,6 +7,13 @@ import { EmployeeAvatar } from "@/components/shared/employee-avatar";
 import { api } from "@/lib/api/client";
 import type { Employee, Project, ProjectTaskImage, TaskPriority, TaskStatus, User } from "@/types";
 import { TASK_STATUSES, TASK_STATUS_LABELS } from "@/types";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "cn";
 
@@ -152,7 +159,15 @@ export function StatusMenu({
   );
 }
 
-export function TaskImagePreview({ id, alt }: { id: string; alt: string }) {
+export function TaskImagePreview({
+  id,
+  alt,
+  size = "thumb",
+}: {
+  id: string;
+  alt: string;
+  size?: "thumb" | "full";
+}) {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     let url = "";
@@ -169,8 +184,28 @@ export function TaskImagePreview({ id, alt }: { id: string; alt: string }) {
       if (url) URL.revokeObjectURL(url);
     };
   }, [id]);
-  if (!src) return <div className="h-24 w-32 rounded-md bg-muted" />;
-  return <img src={src} alt={alt} className="h-24 w-32 rounded-md object-cover" />;
+  if (!src) {
+    return (
+      <div
+        className={cn(
+          "rounded-md bg-muted",
+          size === "full" ? "h-[min(70vh,32rem)] w-full" : "h-24 w-32",
+        )}
+      />
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={cn(
+        "rounded-md",
+        size === "full"
+          ? "max-h-[min(80vh,40rem)] w-full object-contain"
+          : "h-24 w-32 object-cover",
+      )}
+    />
+  );
 }
 
 export function Prop({ label, children }: { label: string; children: ReactNode }) {
@@ -285,12 +320,35 @@ export function AssigneePicker({
 }
 
 export function ImageStrip({ images }: { images: ProjectTaskImage[] }) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const active = images.find((image) => image.id === activeId) ?? null;
+
   if (images.length === 0) return null;
+
   return (
-    <div className="mt-2 flex flex-wrap gap-2">
-      {images.map((image) => (
-        <TaskImagePreview key={image.id} id={image.id} alt={image.fileName} />
-      ))}
-    </div>
+    <>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {images.map((image) => (
+          <button
+            key={image.id}
+            type="button"
+            className="rounded-md transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={() => setActiveId(image.id)}
+            aria-label={`Open attachment ${image.fileName}`}
+          >
+            <TaskImagePreview id={image.id} alt={image.fileName} />
+          </button>
+        ))}
+      </div>
+      <Dialog open={Boolean(active)} onOpenChange={(open) => !open && setActiveId(null)}>
+        <DialogContent className="max-w-[min(96vw,56rem)] gap-3 p-3 sm:max-w-[min(96vw,56rem)]">
+          <DialogHeader>
+            <DialogTitle className="truncate pr-8">{active?.fileName ?? "Attachment"}</DialogTitle>
+            <DialogDescription className="sr-only">Full-size attachment preview</DialogDescription>
+          </DialogHeader>
+          {active ? <TaskImagePreview id={active.id} alt={active.fileName} size="full" /> : null}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
