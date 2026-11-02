@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api/client";
 import {
+  ADMIN_ATTENDANCE_EDIT_UNTIL_LABEL,
   adminAttendanceEditOpen,
   officeTimeValue,
   type AdminBreakInput,
@@ -71,7 +72,7 @@ export function AdminAttendanceTimeEditor({ record }: { record: AttendanceRecord
       <div>
         <p className="text-sm font-medium">Correct times</p>
         <p className="text-xs text-muted-foreground">
-          Admins can change clock-in, clock-out, lunch, and personal breaks until 30 Oct 2026. This option closes after that date.
+          Admins can change clock-in, clock-out, lunch, and personal breaks until {ADMIN_ATTENDANCE_EDIT_UNTIL_LABEL}. This option closes after that date.
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">

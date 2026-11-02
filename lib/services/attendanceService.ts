@@ -1,5 +1,10 @@
 import { format, parseISO } from "date-fns";
-import { adminAttendanceEditOpen, applyAdminAttendanceTimes, type AdminTimeInput } from "@/lib/attendance/admin-adjust";
+import {
+  adminAttendanceEditClosedMessage,
+  adminAttendanceEditOpen,
+  applyAdminAttendanceTimes,
+  type AdminTimeInput,
+} from "@/lib/attendance/admin-adjust";
 import {
   computeStoredAttendanceMetrics,
   getActiveBreak,
@@ -287,7 +292,7 @@ export const attendanceService = {
   },
   async adjustTimes(attendanceId: string, input: AdminTimeInput) {
     if (!adminAttendanceEditOpen()) {
-      throw new Error("Attendance time corrections ended on 30 Oct 2026.");
+      throw new Error(adminAttendanceEditClosedMessage());
     }
     const data = getData();
     const record = data.attendanceRecords.find((item) => item.id === attendanceId);

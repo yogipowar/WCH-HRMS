@@ -30,7 +30,13 @@ import type {
   User,
 } from "@/types";
 import { DOCUMENT_TYPES, LEAVE_TYPES } from "@/types";
-import { applyAdminAttendanceTimes, adminAttendanceEditOpen, correctMisappliedHalfDays, type AdminTimeInput } from "@/lib/attendance/admin-adjust";
+import {
+  adminAttendanceEditClosedMessage,
+  adminAttendanceEditOpen,
+  applyAdminAttendanceTimes,
+  correctMisappliedHalfDays,
+  type AdminTimeInput,
+} from "@/lib/attendance/admin-adjust";
 import { applyLeaveToBalance, currentLeaveYearStart, defaultLeaveBalance, hasApprovedHalfDayLeave, isInCurrentLeaveYear, leaveYearLabel, YEARLY_PAID_LEAVES } from "@/lib/leave/policy";
 import { isPayslipReleased } from "@/lib/payroll/record";
 import { resolveColorTheme } from "@/lib/theme/color-themes";
@@ -1365,7 +1371,7 @@ export async function handleApiRequest(request: Request, parts: string[]) {
         return jsonResponse(403, { error: "Only admins can correct attendance times." });
       }
       if (!adminAttendanceEditOpen()) {
-        return jsonResponse(403, { error: "Attendance time corrections ended on 30 Oct 2026." });
+        return jsonResponse(403, { error: adminAttendanceEditClosedMessage() });
       }
       const body = (await request.json()) as AdminTimeInput & { attendanceId?: string };
       if (!body.attendanceId) {

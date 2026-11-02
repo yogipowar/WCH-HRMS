@@ -4,7 +4,13 @@ import { minutesBetween, summarizeAttendance } from "@/lib/attendance/calculatio
 import type { AttendanceRecord, AttendanceStatus, BreakRecord, BreakType, LateRemovalRequest } from "@/types";
 
 /** Inclusive last day admins may correct clock and break times. */
-export const ADMIN_ATTENDANCE_EDIT_UNTIL = "2026-10-30";
+export const ADMIN_ATTENDANCE_EDIT_UNTIL = "2026-11-30";
+
+export const ADMIN_ATTENDANCE_EDIT_UNTIL_LABEL = "30 Nov 2026";
+
+export function adminAttendanceEditClosedMessage() {
+  return `Attendance time corrections ended on ${ADMIN_ATTENDANCE_EDIT_UNTIL_LABEL}.`;
+}
 
 const OFFICE_OFFSET_MINUTES = 5 * 60 + 30;
 
@@ -93,7 +99,7 @@ export function applyAdminAttendanceTimes(options: {
 }): { record: AttendanceRecord } | { error: string } {
   const now = options.now ?? new Date();
   if (!adminAttendanceEditOpen(now)) {
-    return { error: "Attendance time corrections ended on 30 Oct 2026." };
+    return { error: adminAttendanceEditClosedMessage() };
   }
 
   const { record, input } = options;
