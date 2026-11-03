@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { AdminAttendanceTimeEditor } from "@/components/attendance/admin-time-editor";
 import { AttendanceHistoryList } from "@/components/attendance/attendance-history-list";
+import { AttendanceMonthCalendar } from "@/components/attendance/attendance-month-calendar";
 import { EmployeeAttendanceBoard } from "@/components/attendance/employee-attendance-board";
 import { AttendanceTimeline } from "@/components/attendance/attendance-timeline";
 import { LateRemovalAdminPanel } from "@/components/attendance/late-removal-admin";
@@ -103,6 +104,15 @@ export function AttendanceHistoryPage() {
   const isEmployee = user?.role === "EMPLOYEE";
   const today = format(new Date(), "yyyy-MM-dd");
 
+  const selectedEmployee = !isEmployee && employeeId !== "all"
+    ? data.employees.find((item) => item.id === employeeId) ?? null
+    : null;
+
+  const employeeCalendarRecords = useMemo(() => {
+    if (!selectedEmployee) return [];
+    return data.attendanceRecords.filter((item) => item.employeeId === selectedEmployee.id);
+  }, [data.attendanceRecords, selectedEmployee]);
+
   const source = useMemo(() => {
     let rows = data.attendanceRecords;
     if (isEmployee && user) {
@@ -183,6 +193,16 @@ export function AttendanceHistoryPage() {
           </div>
         ) : null}
       </div>
+      {selectedEmployee ? (
+        <AttendanceMonthCalendar
+          records={employeeCalendarRecords}
+          settings={data.settings}
+          holidays={data.holidays}
+          selectedDate={date || undefined}
+          onSelectDate={setDate}
+          employeeName={selectedEmployee.fullName}
+        />
+      ) : null}
       <AttendanceHistoryList records={source} showEmployee={!isEmployee} />
     </div>
   );
